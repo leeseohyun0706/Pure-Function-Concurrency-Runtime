@@ -39,6 +39,8 @@ struct EdgeNode {
 
 /*
  * Base Abstraction Task.
+ * I want this Task class not to use vtable, yet it's really hard idioms in C++ that I need to implement.
+ * Otherwise, I can use a fixed type function so that every task has the same argument types and return type.
  */
 class Task : public std::enable_shared_from_this<Task> {
 protected:

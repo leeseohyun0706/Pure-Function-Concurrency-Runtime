@@ -29,6 +29,7 @@ public:
 
     auto getSlot() { return _slot; }
     OutputSlot<T>* getOutputSlot() const { return _slot.get(); }
+
     const T& read_ready() const {
         return _slot->read_ready();
     }

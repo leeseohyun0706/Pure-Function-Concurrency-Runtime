@@ -21,6 +21,6 @@ c_add_test(unit_tests unit unit/concurrency/deque_test.cpp)
 
 find_package(benchmark CONFIG REQUIRED)
 
-add_executable(stress_bench benchmark/stress_bench.cpp)
-target_include_directories(stress_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
-target_link_libraries(stress_bench PRIVATE concal benchmark::benchmark_main)
+#add_executable(stress_bench benchmark/stress_bench.cpp)
+#target_include_directories(stress_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
+#target_link_libraries(stress_bench PRIVATE concal benchmark::benchmark_main)

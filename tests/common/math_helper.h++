@@ -37,7 +37,7 @@ namespace GenericMath {
 
 template<typename T>
 struct MathFuncs {
- PureFunc<T(T, T)> add, sub, mul;
+ PureFunc<T(T, T)> add, sub, mul, div;
  PureFunc<T(T, int)> pow;
  PureFunc<T(T)> exp, sin, cos;
 
@@ -49,7 +49,8 @@ struct MathFuncs {
        pow(rt.func_register(GenericMath::pow<T>)),
        exp(rt.func_register(GenericMath::exp<T>)),
        sin(rt.func_register(GenericMath::sin<T>)),
-       cos(rt.func_register(GenericMath::cos<T>)) {}
+       cos(rt.func_register(GenericMath::cos<T>)),
+       div(rt.func_register(GenericMath::div<T>)) {}
 };
 
 

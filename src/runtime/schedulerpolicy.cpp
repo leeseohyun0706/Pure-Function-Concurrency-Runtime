@@ -3,12 +3,13 @@
 #include <pure/logging/logger.h++>
 #include "scheduler.h++"
 
-SchedulerPolicy::SchedulerPolicy(std::vector<std::unique_ptr<Worker>>& workers, spdlog::logger& logger, SchedulerStats& stats,  SchedulerConfiguration& config)
+SchedulerPolicy::SchedulerPolicy(SchedulerControl& control, std::vector<std::unique_ptr<Worker>>& workers, spdlog::logger& logger, SchedulerStats& stats,  SchedulerConfiguration& config)
     : _config(config),
     _workers(workers),
     _globalInjectionQueue2(1024 * 64),
     _spdlogger(logger),
-    _stats(stats)
+    _stats(stats),
+    _control(control)
 {
 }
 
@@ -22,7 +23,8 @@ Task * SchedulerPolicy::try_pop(ChaseLevDeque<Task> &_deque)  {
 
 std::shared_ptr<Task> SchedulerPolicy::try_steal() {
     // TODO : Create other work-stealing logics (Currently, searching all workers)
-    if (!_config.work_stealing) return nullptr;
+
+    if (!_config.work_stealing) return nullptr; // Is there any more awesome way to create configuration branch?
 
     auto self = current_worker();
     size_t n = _workers.size();
@@ -87,19 +89,19 @@ std::shared_ptr<Task> SchedulerPolicy::try_find_task(ChaseLevDeque<Task> &_deque
 }
 
 void SchedulerPolicy::wake_one() {
-    _workEpoch.fetch_add(1);
+    _control._workEpoch.fetch_add(1);
     // vs notify_one() ?????
     // _workEpoch.notify_all();
-    _workEpoch.notify_one();
+    _control._workEpoch.notify_one();
 }
 
 void SchedulerPolicy::wake_all() {
-    _workEpoch.fetch_add(1);
-    _workEpoch.notify_all();
+    _control._workEpoch.fetch_add(1);
+    _control._workEpoch.notify_all();
 }
 
 void SchedulerPolicy::wait(size_t old) const {
-    _workEpoch.wait(old);
+    _control._workEpoch.wait(old);
 }
 
 void SchedulerPolicy::submit(Task *task) {
@@ -122,4 +124,16 @@ void SchedulerPolicy::enqueue_ready(Task *task) {
 spdlog::logger & SchedulerPolicy::spdlog_for_caller() {
     if (auto* w = current_worker()) return w->spdlogger();
     return _spdlogger;
+}
+
+size_t SchedulerPolicy::workEpoch() const {
+    return _control._workEpoch.load();
+}
+
+void SchedulerPolicy::admit() {
+    _control.admit();
+}
+
+void SchedulerPolicy::retire() {
+    _control.retire();
 }

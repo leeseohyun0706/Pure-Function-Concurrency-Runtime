@@ -11,8 +11,11 @@ find_package(Threads REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
+find_package(libenvpp CONFIG REQUIRED)
+
 # Options
 option(FFF_BUILD_TESTS "Build unit, integration, and stress tests" ${PROJECT_IS_TOP_LEVEL})
+
 option(FFF_BUILD_BENCHMARKS "Build benchmark executables" ${PROJECT_IS_TOP_LEVEL})
 option(FFF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(FFF_TSAN "Enable ThreadSanitizer" OFF)
@@ -54,7 +57,7 @@ target_link_libraries(concal
         concal_concurrency
         nlohmann_json::nlohmann_json
         Threads::Threads
-        PUBLIC spdlog::spdlog
+        PUBLIC spdlog::spdlog libenvpp::libenvpp
 )
 
 target_compile_definitions(concal PRIVATE

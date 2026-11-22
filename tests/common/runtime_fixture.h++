@@ -14,10 +14,10 @@ protected:
 
 
     static RuntimeConfiguration makeConfig() {
-        RuntimeConfiguration cfg;
-        cfg.tracing.enable = true;
-        cfg.tracing.buffer_size = 1 << 12;
-        return cfg;
+        // RuntimeConfiguration cfg;
+        // cfg.tracing.enable = true;
+        // cfg.tracing.buffer_size = 1 << 12;
+        return RuntimeConfiguration::load_from_env();
     }
 
     Runtime runtime{makeConfig()};
@@ -48,6 +48,7 @@ protected:
     MathFuncs<T> math{runtime};
 };
 
+class DualFixture : public MathRuntimeFixture<Dual> {};
 template<typename T>
 class MathParamFixture : public MathRuntimeFixture<T>, public ::testing::WithParamInterface<size_t>{};
 

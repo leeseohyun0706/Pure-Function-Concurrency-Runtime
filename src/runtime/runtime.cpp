@@ -27,9 +27,14 @@ void Runtime::shutdown() {
 Runtime::~Runtime() = default;
 
 void Runtime::seal(Task &task) {
-    task.seal(_scheduler->getPolicy());
+    // task.seal(_scheduler->getPolicy());
+    _scheduler->seal(&task);
 }
 
 void Runtime::exportTrace(std::ostream &os) {
     _scheduler->exportTrace(os);
+}
+
+void Runtime::admit() {
+    _scheduler->admit();
 }

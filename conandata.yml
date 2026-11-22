@@ -3,3 +3,4 @@ requirements:
   - "nlohmann_json/3.12.0"
   - "benchmark/1.9.4"
   - "spdlog/1.17.0"
+  - "libenvpp/1.5.0"

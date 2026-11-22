@@ -2,7 +2,7 @@
 
 #include "scheduler.h++"
 
-// template<typename R, typename ... Args>
+// Set task as complete
 void Task::complete(SchedulerPolicy &scheduler)  {
     scheduler.stats()._completed.fetch_add(1, std::memory_order_relaxed);
     const auto* node = _successors.exchange(closed(), std::memory_order_acquire);
@@ -25,7 +25,7 @@ void Task::depends_on(Task &parent, EdgeNode& node) {
     // Change the parent's head of successor to node indicating child.
     auto* head = parent._successors.load(std::memory_order_acquire);
     do {
-        if (head == closed()) { // If parent is already closed (means done), undo adding pending and return.
+        if (head == closed()) { // If parent is already closed (means done), cancel adding pending and return.
             _pending.fetch_sub(1, std::memory_order_relaxed);
             return;
         }
@@ -35,7 +35,7 @@ void Task::depends_on(Task &parent, EdgeNode& node) {
 }
 
 bool Task::try_make_ready(SchedulerPolicy &scheduler) {
-    // pending > 0 means its dependency is not resolved.
+    // pending > 0 means its dependency is not yet resolved.
     if (_pending.load(std::memory_order_acquire) != 0)
             return false;
 

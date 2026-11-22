@@ -31,7 +31,7 @@ public:
         _state.wait(ResultState::Empty, std::memory_order_acquire);
     }
 
-
+    // read_ready() returns instant slot value or throw error if state is not ready or contains error
     const T& read_ready() const {
         auto s = _state.load(std::memory_order_acquire);
 
@@ -42,6 +42,7 @@ public:
         return _slot;
     }
 
+    // Set its error from the given argument
     void fail(std::exception_ptr e) {
         if (_state.load(std::memory_order_acquire) != ResultState::Empty) return;
 
@@ -49,6 +50,7 @@ public:
         _state.store(ResultState::Failed, std::memory_order_release);
         _state.notify_all();
     }
+
 
     bool failed() const { return _state.load(std::memory_order_acquire) == ResultState::Failed; }
 

@@ -1,15 +1,19 @@
 #include "worker.h++"
 #include "schedulerpolicy.h++"
 #include <pure/logging/logger.h++>
+#include <spdlog/stopwatch.h>
+
 #include "scheduler.h++"
 
 thread_local Worker* tls_worker = nullptr;
 
+// Return local worker indicating called thread
 Worker* current_worker() {
     return tls_worker;
 }
 
 
+// Return string explanation of given exception pointer
 std::string describe(const std::exception_ptr& error) {
     try { std::rethrow_exception(error); }
     catch (const std::exception& e) { return e.what(); }
@@ -38,6 +42,7 @@ void Worker::task_run(Task *task) {
             break;
     }
     task->complete(_policy);
+    _policy.retire();
     _recorder.instant(TraceEventKind::TaskFinished, task->taskId(), 0);
     _stats._taskExecuted.fetch_add(1, std::memory_order_relaxed);
 }
@@ -52,6 +57,7 @@ void Worker::run() {
         tls_worker = this;
 
         SPDLOG_LOGGER_DEBUG(&_logger, "thread started");
+        spdlog::stopwatch sw;
         // As long as atomic variable _is_stopped is false (Use acquire to read released value).
         while (true) {
             // Store wakeEpoch because it could change (new wakeup) during trying pop and steal.
@@ -99,10 +105,11 @@ void Worker::run() {
 
 
         }
-
+        auto exec_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(sw.elapsed());
+        _stats._totalExecutionNs.store(exec_ns.count(), std::memory_order_relaxed);
         SPDLOG_LOGGER_DEBUG(&_logger,
-            "thread exiting, executed={}",
-            _stats._taskExecuted.load(std::memory_order_relaxed));
+            "thread exiting, executed={} exec_time={}ms",
+            _stats._taskExecuted.load(std::memory_order_relaxed), sw.elapsed_ms().count());
         tls_worker = nullptr;
 }
 

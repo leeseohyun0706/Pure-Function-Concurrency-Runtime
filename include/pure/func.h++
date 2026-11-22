@@ -13,7 +13,7 @@ template<typename Signature>
 class PureFunc;
 
 
-// Warning : DO NOT USE Capture Lambda (that is actually not pure function since a Lambda captures outside variables or states).
+// Warning : DO NOT USE a Capture Lambda (that is actually not pure function since a Lambda captures outside variables or states).
 template<typename R, typename... Args>
 class PureFunc<R(Args...)> {
 private:

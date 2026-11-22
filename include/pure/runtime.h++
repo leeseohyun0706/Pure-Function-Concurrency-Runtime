@@ -18,31 +18,20 @@ private:
     IdGenerator<FuncId> _funcIdGenerator;
     IdGenerator<TaskId> _taskIdGenerator;
 
-    std::mutex _mutex;
-    // std::vector<std::shared_ptr<Task>> _tasks;
+    // std::mutex _mutex;
     std::shared_ptr<spdlog::logger> _logger;
     static void submit() {}
+    void admit();
+    void seal(Task& task);
+
+    template<typename TaskT, typename T>
+    void attach_dependency(TaskT&, const T&, size_t&) {}
+
+    template<typename TaskT, typename T>
+    void attach_dependency(TaskT& child, const OutputRef<T>& ref, size_t& i) {
+        child.depends_on(ref.getTask(), child.edge(i++));
+    }
 public:
-
-    class InvokeScope {
-    private:
-        Runtime& _runtime;
-    public:
-        explicit InvokeScope(Runtime& runtime) : _runtime(runtime) {}
-
-        template<typename R, typename... Args1, typename... Args2>
-        auto invoke(const PureFunc<R(Args1...)>& fn, Args2&&... args) {
-            return _runtime.invoke(fn, std::forward<Args2>(args)...);
-        }
-
-        InvokeScope(const InvokeScope&) = delete;
-        InvokeScope(InvokeScope&&) = delete;
-        InvokeScope& operator=(const InvokeScope&) = delete;
-        InvokeScope& operator=(InvokeScope&&) = delete;
-
-        ~InvokeScope() = default;
-
-    };
 
     explicit Runtime(const RuntimeConfiguration& config = RuntimeConfiguration());
 
@@ -65,27 +54,22 @@ public:
         // By using std::decay_t, it removes 'const' or '&' stuffs in the type.
         auto task =
             std::make_shared<PureFuncTask<R(Args1...), std::decay_t<Args1>...>>(_taskIdGenerator.next(), fn, args...);
+
+        admit();
         task->pin();
 
         size_t edge = 0;
         // Add dependency for Child Task indicating reference input.
         (attach_dependency(*task, args, edge), ...);
+        // Declare slot as std::shared_ptr to store output value.
         std::shared_ptr<OutputSlot<R>> slot(task, &task->output());
         seal(*task);
         return OutputRef<R>{slot, task};
     }
+
     ~Runtime();
-    void seal(Task& task);
 
-    template<typename TaskT, typename T>
-    void attach_dependency(TaskT&, const T&, size_t&) {}
-
-    template<typename TaskT, typename T>
-    void attach_dependency(TaskT& child, const OutputRef<T>& ref, size_t& i) {
-        child.depends_on(ref.getTask(), child.edge(i++));
-    }
 
     void exportTrace(std::ostream& os);
-
 };
 #endif //CONCAL_RUNTIME_H
