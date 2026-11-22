@@ -19,11 +19,6 @@ option(FFF_BUILD_TESTS "Build unit, integration, and stress tests" ${PROJECT_IS_
 option(FFF_BUILD_BENCHMARKS "Build benchmark executables" ${PROJECT_IS_TOP_LEVEL})
 option(FFF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(FFF_TSAN "Enable ThreadSanitizer" OFF)
-#if (CONCAL_TSAN)
-#    add_compile_options(-fsanitize=thread -g)
-#    add_link_options(-fsanitize=thread)
-#endif()
-
 
 # Header directory for concurrency implementations
 add_library(concal_concurrency INTERFACE)
@@ -40,6 +35,7 @@ add_library(concal STATIC
         src/tracing/tracer.cpp
         src/runtime/runtime.cpp
 )
+
 target_compile_features(concal PUBLIC cxx_std_20)
 
 target_include_directories(concal
@@ -67,3 +63,8 @@ if(FFF_BUILD_TESTS OR FFF_BUILD_BENCHMARKS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+
+add_executable(quick_example example/quick_example.cpp)
+target_link_libraries(quick_example PUBLIC concal)
+target_include_directories(quick_example PUBLIC concal_concurrency)

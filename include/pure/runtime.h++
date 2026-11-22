@@ -33,7 +33,7 @@ private:
     }
 public:
 
-    explicit Runtime(const RuntimeConfiguration& config = RuntimeConfiguration());
+    explicit Runtime(const RuntimeConfiguration& config = RuntimeConfiguration::load_from_env());
 
     void start();
     void shutdown();

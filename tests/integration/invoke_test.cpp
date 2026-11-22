@@ -116,6 +116,7 @@ TEST_F(RuntimeFixture, Simple) {
     double pi_estimate = 4.0 * static_cast<double>(inside_circle) / static_cast<double>(N);
     std::cout << "Estimated pi: " << pi_estimate << '\n';
 }
+
 TEST_F(DoubleFixture, MonteCarlo) {
 
     constexpr long long N = 10'000'00;
@@ -126,6 +127,7 @@ TEST_F(DoubleFixture, MonteCarlo) {
     std::atomic<unsigned long long> inside_circle{0};
 
     std::vector<OutputRef<bool>> outputs;
+    // Note that the logic of increasing inside_circle is not a pure function, yet it's just test.
     auto calc = runtime.func_register([&inside_circle](double x, double y) { if (x * x + y * y <= 1.0) inside_circle.fetch_add(1, std::memory_order_relaxed); return true; });
 
     for (long long i = 0; i < N; ++i) {
