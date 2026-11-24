@@ -26,9 +26,9 @@ void TraceRecorder::instant(TraceEventKind kind, TaskId taskId, uint64_t value) 
     emit(TraceEventShape::Instant, kind, taskId, nowNs(), 0, value);
 }
 
-void TraceRecorder::span(TraceEventKind kind, TaskId taskId, uint64_t startNs, uint64_t endNs) {
+void TraceRecorder::span(TraceEventKind kind, TaskId taskId, uint64_t startNs, uint64_t endNs, uint64_t value) {
     if (!enabled()) return;
-    emit(TraceEventShape::Span, kind, taskId, startNs, endNs - startNs, 0);
+    emit(TraceEventShape::Span, kind, taskId, startNs, endNs - startNs, value);
 }
 
 void TraceRecorder::counter(TraceEventKind kind, uint64_t value) {

@@ -58,7 +58,7 @@ public:
         TraceEventKind kind,
         TaskId taskId = {0},
         uint64_t value = 0);
-    void span(TraceEventKind kind, TaskId taskId, uint64_t startNs, uint64_t endNs);
+    void span(TraceEventKind kind, TaskId taskId, uint64_t startNs, uint64_t endNs, uint64_t value = 0);
     void counter(TraceEventKind kind, uint64_t value);
 
     bool enabled() const noexcept { return _config.enable; }

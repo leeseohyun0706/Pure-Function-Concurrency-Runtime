@@ -145,20 +145,14 @@ protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTE
 
     OutputSlot<R> _outputs;
 
-    ExecResult finish_skipped(const std::exception_ptr &error) {
-        ExecResult result{ExecResult::Status::Skipped, error};
+
+    ExecResult finish_error(ExecResult::Status status, const std::exception_ptr &error) {
+        ExecResult result{status, error};
         _outputs.fail(result.error);
         _state.store(TaskState::Fail, std::memory_order_release);
+        _inputs.reset();
         return result;
     }
-
-    ExecResult finish_failed(const std::exception_ptr &error) {
-        ExecResult result{ExecResult::Status::Failed, error};
-        _outputs.fail(result.error);
-        _state.store(TaskState::Fail, std::memory_order_release);
-        return result;
-    }
-
     std::exception_ptr input_error() {
         std::exception_ptr result{nullptr};
         // Use std::apply to grap errors from inputs
@@ -200,7 +194,7 @@ public:
 
         if (const auto error = input_error()) {
             // If arguments have any errors, the task will be skipped.
-            return finish_skipped(error);
+            return finish_error(ExecResult::Status::Skipped, error);
         }
         try {
             R output = std::apply(
@@ -217,7 +211,7 @@ public:
         }
         catch (...) {
             // If an exception is detected in a task, it will be failed.
-            return finish_failed(std::current_exception());
+            return finish_error(ExecResult::Status::Failed, std::current_exception());
         }
     }
 

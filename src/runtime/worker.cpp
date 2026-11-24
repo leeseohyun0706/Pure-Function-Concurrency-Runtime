@@ -33,14 +33,15 @@ void Worker::task_run(Task *task) {
 
     switch (result.status) {
         case ExecResult::Status::Ok:
-            _context.stats._completed.fetch_add(1, std::memory_order_relaxed);
+            _context.stats.completed();
             break;
         case ExecResult::Status::Failed :
             _logger.error("task {} threw : {}", task->taskId(), describe(result.error));
-            _context.stats._failed.fetch_add(1, std::memory_order_relaxed);
+            _context.stats.failed();
             break;
         case ExecResult::Status::Skipped :
             _logger.error("task {} skipped: parents failed", task->taskId());
+            _context.stats.skipped();
             break;
     }
     task->complete(_policy);
@@ -58,7 +59,7 @@ std::shared_ptr<Task> Worker::find_task() {
     _stats.steal_attempted();
     _tracer.steal_attempted();
     // Try to steal from another deque by SchedulerPolicy
-    if (auto task = _policy.try_steal()) {
+    if (auto task = _policy.try_steal_from_workers(*this)) {
         _stats.steal_succeeded();
         _tracer.steal_successed(task->taskId());
         return task;

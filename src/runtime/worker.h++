@@ -6,14 +6,12 @@
 #include <deque>
 #include <thread>
 
+#include "runtime/worker_stats.h++"
 #include "concurrency/chase_lev_deque.h++"
 #include "pure/task.h++"
 #include "tracing/worker_trace.h++"
 
 
-
-// struct SchedulerControl;
-// struct SchedulerStats;
 struct WorkerExecutionContext;
 
 enum class WorkerState {
@@ -21,74 +19,6 @@ enum class WorkerState {
     Searching, // For pop from local deque or steal from other worker.
     Parked, // There is no executable task.
     Stopped
-};
-
-class alignas(64) WorkerStats {
-    private:
-    std::atomic<uint64_t> _taskExecuted{0};
-
-    std::atomic<uint64_t> _stealAttempts{0};
-    std::atomic<uint64_t> _stealSuccesses{0};
-
-    std::atomic<uint64_t> _parkedAttempts{0};
-    std::atomic<uint64_t> _waitReturns{0};
-    std::atomic<uint64_t> _totalExecutionNs{0};
-
-    public:
-    struct SnapShot {
-        uint64_t taskExecuted;
-        uint64_t stealAttempts;
-        uint64_t stealSuccesses;
-        uint64_t parkedAttempts;
-        uint64_t waitReturns;
-        uint64_t totalExecutionNs;
-    };
-
-    void task_executed() noexcept {
-        _taskExecuted.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    void steal_attempted() noexcept {
-        _stealAttempts.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    void steal_succeeded() noexcept {
-        _stealSuccesses.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    void park_attempted() noexcept {
-        _parkedAttempts.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    void total_execution_ns(uint64_t ns) noexcept {
-        _totalExecutionNs.store(ns, std::memory_order_relaxed);
-    }
-
-    SnapShot snapshot() const noexcept {
-        return {
-            _taskExecuted.load(std::memory_order_relaxed),
-            _stealAttempts.load(std::memory_order_relaxed),
-            _stealSuccesses.load(std::memory_order_relaxed),
-            _parkedAttempts.load(std::memory_order_relaxed),
-            _waitReturns.load(std::memory_order_relaxed),
-            _totalExecutionNs.load(std::memory_order_relaxed),
-        };
-    }
-
-};
-
-
-class WorkerSignal {
-private:
-    std::atomic<uint64_t> _epoch{0};
-
-public:
-    uint64_t snapshot() const noexcept { return _epoch.load(std::memory_order_acquire); }
-
-    void notify_one() { _epoch.fetch_add(1, std::memory_order_release); _epoch.notify_one(); }
-    void notify_all() { _epoch.fetch_add(1, std::memory_order_release); _epoch.notify_all(); }
-
-    void wait(uint64_t old) const { _epoch.wait(old, std::memory_order_acquire); }
 };
 
 /*
@@ -164,7 +94,7 @@ public:
         return _deque;
     }
     spdlog::logger& spdlogger() { return _logger; }
-    WorkerStats::SnapShot stats() const { return _stats.snapshot(); }
+    WorkerStats::Snapshot stats() const { return _stats.snapshot(); }
 };
 
 inline std::string_view format_as(WorkerState ws) {

@@ -21,7 +21,7 @@ public:
     TraceScope& operator=(const TraceScope&) = delete;
     TraceScope& operator=(TraceScope&&) = delete;
     ~TraceScope() {
-        _recorder.span(_kind, _taskId, _startNs, _recorder.nowNs());
+        _recorder.span(_kind, _taskId, _startNs, _recorder.nowNs(), _value);
     }
 };
 

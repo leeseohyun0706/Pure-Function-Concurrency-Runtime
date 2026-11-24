@@ -46,10 +46,13 @@ void Scheduler::shutdown() {
     stop_request();
     join_worker();
 
-    _logger.info("shutdown in {:.3}s    submitted={} complete={} failed={}",
-        sw, _executionContext.stats._submitted.load(std::memory_order_relaxed),
-        _executionContext.stats._completed.load(std::memory_order_relaxed),
-        _executionContext.stats._failed.load(std::memory_order_relaxed)
+    const auto scheduler_stats = _executionContext.stats.snapshot();
+
+    _logger.info("shutdown in {:.3}s    submitted={} complete={} skipped={} failed={}",
+        sw, scheduler_stats.submitted,
+        scheduler_stats.completed,
+        scheduler_stats.skipped,
+        scheduler_stats.failed
     );
 
     for (auto& w : _workers) {
