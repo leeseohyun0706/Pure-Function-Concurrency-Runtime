@@ -33,8 +33,53 @@ class Task;
 
 // Can I utilize memoization?
 struct EdgeNode {
-    Task* child = nullptr;
-    EdgeNode* next = nullptr;
+    Task* child = nullptr; // Vertex
+    EdgeNode* next = nullptr; // Link
+};
+
+// Single Lock-Free Linked List to manage input dependency
+class SuccessorList {
+private:
+    static inline EdgeNode _closed{}; // Static reference of last edge (to avoid using nullptr).
+
+    std::atomic<EdgeNode*> _head{nullptr};
+
+    static EdgeNode* closed() noexcept { return &_closed; }
+
+public:
+    SuccessorList() = default;
+    SuccessorList(const SuccessorList&) = delete;
+    SuccessorList& operator=(const SuccessorList&) = delete;
+
+    bool try_attach(EdgeNode& node) {
+        auto* head = _head.load(std::memory_order_acquire);
+
+        while (head != closed()) {
+            node.next = head;
+
+            if (_head.compare_exchange_weak(head, &node, std::memory_order_acq_rel, std::memory_order_acquire)) return true;
+        }
+
+        return false;
+    }
+
+    template<typename Visitor> requires std::is_invocable_v<Visitor&, Task&>
+    bool close_and_visit(Visitor&& visit) {
+
+        auto *node = _head.exchange(closed(), std::memory_order_acq_rel);
+
+        if (node == closed()) return false;
+
+        while (node != nullptr) {
+            auto* next = node->next;
+            auto* child = node->child;
+
+            visit(*child);
+
+            node = next;
+        }
+        return true;
+    }
 };
 
 /*
@@ -48,17 +93,14 @@ protected:
 
     // Starts at 1 because of seal() guard.
     // Thus, the task cannot become ready while dependencies are still being attached.
-    // Also, the task only runs correctly when pending is 0 (otherwise, it would occurs output is not ready error).
+    // Also, the task only runs correctly when pending is 0 (otherwise, it would occur output is not ready error).
     std::atomic<uint32_t> _pending{1};
-    std::atomic<EdgeNode*> _successors{nullptr};
     std::atomic<TaskState> _state{TaskState::Ready};
 
 
     std::shared_ptr<Task> _keepAlive; // The ownership of task is owned by itself and managed by pin() and unpin().
 
-    static inline EdgeNode kClosed{}; // Static reference of last edge (to avoid using nullptr).
-    static EdgeNode* closed() noexcept { return &kClosed; }
-
+    SuccessorList _successors;
 public:
 
     explicit Task(const TaskId taskId) : _taskId(taskId) {}
@@ -66,7 +108,7 @@ public:
     virtual ~Task() = default;
     virtual ExecResult execute() = 0; // Execute the task function and return its value or error.
 
-
+    // By using pin() and unpin(), this task owns itself so that it maintains its ownership until call unpin().
     void pin() { _keepAlive = shared_from_this(); }
     std::shared_ptr<Task> unpin() { return std::move(_keepAlive); }
 
@@ -75,16 +117,9 @@ public:
     void depends_on(Task& parent, EdgeNode& node);
     TaskId taskId() const { return _taskId; }
 
-    bool try_make_ready(SchedulerPolicy& scheduler);
+    bool seal(SchedulerPolicy& scheduler);
 
-    bool seal(SchedulerPolicy& scheduler) {
-        // If there is no dependency at the time (also, the early-completed task), make ready itself to the scheduler.
-        if (_pending.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            try_make_ready(scheduler);
-            return true;
-        }
-        return false;
-    }
+    void resolve_dependency(SchedulerPolicy& scheduler);
 
 };
 
@@ -93,13 +128,15 @@ template<typename A, typename P>
 concept InputFor = std::convertible_to<A, P> || std::same_as<std::remove_cvref_t<A>, OutputRef<P>>;
 
 
+
 template<typename F, typename ...Args>
 class PureFuncTask final : public Task {
-protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTECTED AND PRIVATE???
-
-    std::array<EdgeNode, sizeof...(Args)> _edges{}; // Each edge maps each input
+protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTECTED AND PRIVATE??? (IT ALWAYS MAKES ME CONFUSE)
 
     using R = std::invoke_result_t<F, Args...>; // Deduct a return type from FunctionType
+
+
+    std::array<EdgeNode, sizeof...(Args)> _edges{}; // Each edge maps by each argument of the function
 
     PureFunc<F> _function;
 

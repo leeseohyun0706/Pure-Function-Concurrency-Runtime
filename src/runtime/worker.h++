@@ -12,7 +12,9 @@
 
 
 
-
+struct SchedulerControl;
+struct SchedulerStats;
+struct WorkerExecutionContext;
 
 enum class WorkerState {
     Running,
@@ -33,6 +35,18 @@ struct alignas(64) WorkerStats {
 };
 
 
+class WorkerSignal {
+private:
+    std::atomic<uint64_t> _epoch{0};
+
+public:
+    uint64_t snapshot() const noexcept { return _epoch.load(std::memory_order_acquire); }
+
+    void notify_one() { _epoch.fetch_add(1, std::memory_order_release); _epoch.notify_one(); }
+    void notify_all() { _epoch.fetch_add(1, std::memory_order_release); _epoch.notify_all(); }
+
+    void wait(uint64_t old) const { _epoch.wait(old, std::memory_order_acquire); }
+};
 
 /*
  * Worker executes its tasks included in chase-lev deque on its own thread.
@@ -56,7 +70,7 @@ private:
     WorkerRecordBuffer _records;
     TraceRecorder _recorder;
     spdlog::logger& _logger;
-
+    WorkerExecutionContext& _context;
     void task_run(Task* task);
     void run();
 public:
@@ -70,7 +84,8 @@ public:
         TraceRecorder::Clock::time_point origin,
         spdlog::logger& logger,
         WorkerConfiguration& config,
-        TracingConfiguration& tracingConfig
+        TracingConfiguration& tracingConfig,
+        WorkerExecutionContext &context
     ) :
     _config(config),
     _workerId(workerId),
@@ -78,7 +93,8 @@ public:
     _policy(policy),
     _records(tracingConfig.buffer_size),
     _recorder(_records, _workerId, origin, tracingConfig),
-    _logger(logger)
+    _logger(logger),
+    _context(context)
     {
     }
 
@@ -93,8 +109,9 @@ public:
 
 
     // Because worker thread could be still running when stop signal is received, there are two ways in scheduler policy:
-    // First : Just entirely stop the worker when stop is requested, regardless of whether local deque is empty or not (Current Version).
-    // Second : Stop the worker after all tasks in local deque entirely popped.
+    // First : Just entirely stop the worker when stop is requested, regardless of whether local deque is empty or not (SchedulerConfiguration::ShutdownMode::Cancel).
+    // Second : Stop the worker after all tasks in local deque entirely popped (SchedulerConfiguration::ShutdownMode::Drain).
+    // These two options are depended on the SchedulerConfiguration::shutdown_mode
     void stop_request();
     std::span<const TraceEvent> records() const;
 

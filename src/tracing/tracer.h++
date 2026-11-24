@@ -36,6 +36,7 @@ enum class TraceEventKind : uint8_t {
     WorkerWaitExited,
 
     WakeSignal,
+    End,
 };
 
 std::string to_string(TraceEventKind kind);

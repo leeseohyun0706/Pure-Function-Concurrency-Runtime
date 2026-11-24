@@ -29,7 +29,8 @@ Like we used instructions `ldr` and `str`, for ensuring memory orders during ato
 ```assembly
 ldar w0, [x1].
 ```
-
 ```assembley
 stlr w0, [x1].
 ```
+
+`std::memory_order_acquire` and `std::memory_order_release` are mapping to these instructions `ldar` and `stlr` respectively.

@@ -21,33 +21,34 @@ void Scheduler::seal(Task *task) {
 
 
 void Scheduler::start() {
-    if (_control._state.load(std::memory_order_acquire) == SchedulerState::Started) {
+    if (_executionContext.control._state.load(std::memory_order_acquire) == SchedulerState::Started) {
         throw std::runtime_error("The scheduler is already started.");
     }
     for (auto& worker : _workers) {
         worker->start();
     }
-    _control._state.store(SchedulerState::Started, std::memory_order_release);
+    _executionContext.control._state.store(SchedulerState::Started, std::memory_order_release);
 }
 
 void Scheduler::shutdown() {
-    if (_control._state.load(std::memory_order_acquire) == SchedulerState::Stopped) {
+    if (_executionContext.control._state.load(std::memory_order_acquire) == SchedulerState::Stopped) {
         throw std::runtime_error("The scheduler is already stopped");
     }
 
     if (_config.shutdown_mode == SchedulerConfiguration::ShutdownMode::Drain) {
-        for (auto n = _control._outstanding.load(); n != 0; n = _control._outstanding.load()) {
-            _control._outstanding.wait(n);
+        for (auto n = _executionContext.control._outstanding.load(); n != 0; n = _executionContext.control._outstanding.load()) {
+            _executionContext.control._outstanding.wait(n);
         }
     }
+
     spdlog::stopwatch sw;
     stop_request();
     join_worker();
 
     _logger.info("shutdown in {:.3}s    submitted={} complete={} failed={}",
-        sw, _stats._submitted.load(std::memory_order_relaxed),
-        _stats._completed.load(std::memory_order_relaxed),
-        _stats._failed.load(std::memory_order_relaxed)
+        sw, _executionContext.stats._submitted.load(std::memory_order_relaxed),
+        _executionContext.stats._completed.load(std::memory_order_relaxed),
+        _executionContext.stats._failed.load(std::memory_order_relaxed)
     );
 
     for (auto& w : _workers) {
@@ -62,14 +63,14 @@ void Scheduler::shutdown() {
             s._parkedAttempts.load(std::memory_order_relaxed)
         );
     }
-    _control._state.store(SchedulerState::Stopped, std::memory_order_release);
+    _executionContext.control._state.store(SchedulerState::Stopped, std::memory_order_release);
 }
 
 void Scheduler::stop_request()  {
     for (auto& worker : _workers) {
         worker->stop_request();
     }
-    _policy.wake_all();
+    _executionContext.signal.notify_all();
 }
 
 void Scheduler::join_worker() const {
@@ -82,8 +83,10 @@ void Scheduler::join_worker() const {
 Scheduler::Scheduler(LoggingContext &logContext, SchedulerConfiguration &config, TracingConfiguration& tracing)
     : _config(config),
     _logger(*logContext.make("rt.sc")),
-    _policy(_control, _workers, _logger, _stats, _config),
-    _loggingContext(logContext) {
+    _policy(_workers, _logger, _executionContext.stats, _config, _executionContext.signal),
+    _loggingContext(logContext)
+    // _executionContext(_stats, _control, _signal)
+    {
 
     auto origin = TraceRecorder::Clock::now();
 
@@ -92,10 +95,10 @@ Scheduler::Scheduler(LoggingContext &logContext, SchedulerConfiguration &config,
         _workers.push_back(std::make_unique<Worker>(
             w_id, _policy, origin,
             *_loggingContext.make("rt.sc.wo" + std::to_string(w_id._value)),
-            _config.worker, tracing));
+            _config.worker, tracing, _executionContext));
     }
 }
 
 Scheduler::~Scheduler() {
-    if (_control._state.load(std::memory_order_acquire) != SchedulerState::Stopped) shutdown();
+    if (_executionContext.control._state.load(std::memory_order_acquire) != SchedulerState::Stopped) shutdown();
 }

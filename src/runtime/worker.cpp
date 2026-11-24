@@ -35,14 +35,15 @@ void Worker::task_run(Task *task) {
         case ExecResult::Status::Ok: break;
         case ExecResult::Status::Failed :
             _logger.error("task {} threw : {}", task->taskId(), describe(result.error));
-            _policy.stats()._failed.fetch_add(1, std::memory_order_relaxed);
+            _context.stats._failed.fetch_add(1, std::memory_order_relaxed);
             break;
         case ExecResult::Status::Skipped :
             _logger.error("task {} skipped: parents failed", task->taskId());
             break;
     }
+    _context.stats._completed.fetch_add(1, std::memory_order_relaxed);
     task->complete(_policy);
-    _policy.retire();
+    _context.control.retire();
     _recorder.instant(TraceEventKind::TaskFinished, task->taskId(), 0);
     _stats._taskExecuted.fetch_add(1, std::memory_order_relaxed);
 }
@@ -61,7 +62,7 @@ void Worker::run() {
         // As long as atomic variable _is_stopped is false (Use acquire to read released value).
         while (true) {
             // Store wakeEpoch because it could change (new wakeup) during trying pop and steal.
-            const auto observed = _policy.workEpoch();
+            const auto observed = _context.signal.snapshot();
 
             _state.store(WorkerState::Searching, std::memory_order_release);
 
@@ -99,9 +100,9 @@ void Worker::run() {
                 TraceScope scope(_recorder, TraceEventKind::WorkerParking, {0}, observed);
                 // wait(observed) makes a current thread block as long as _wakeEpoch is the same as observed.
                 // What if this part be spin-lock?
-                _policy.wait(observed);
+                _context.signal.wait(observed);
             }
-            _recorder.instant(TraceEventKind::WorkerWaitExited, {0}, _policy.workEpoch());
+            _recorder.instant(TraceEventKind::WorkerWaitExited, {0}, _context.signal.snapshot());
 
 
         }
@@ -120,7 +121,7 @@ void Worker::join() {
 }
 
 void Worker::wake() {
-    _policy.wake_one();
+    _context.signal.notify_one();
     _recorder.instant(TraceEventKind::WakeSignal, {0}, 0);
 }
 

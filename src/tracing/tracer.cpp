@@ -47,7 +47,7 @@ void TraceRecorder::counter(TraceEventKind kind, uint64_t value) {
 
 void TraceExporter::exportTrace(const std::span<const TraceEvent> &events, std::ostream &output) {
     json js;
-
+    
     for (auto& event : events) {
         switch (event._shape) {
             case TraceEventShape::Instant:

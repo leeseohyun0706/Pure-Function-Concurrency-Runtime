@@ -42,6 +42,12 @@ struct SchedulerControl {
     }
 };
 
+struct WorkerExecutionContext {
+    SchedulerStats stats;
+    SchedulerControl control;
+    WorkerSignal signal;
+};
+
 /*
  * Scheduler distributes tasks through worker threads.
  */
@@ -52,17 +58,13 @@ private:
     size_t _schedulerId{0};
 
     spdlog::logger& _logger;
-    SchedulerStats _stats;
 
-    // size_t _worker_size;
     std::vector<std::unique_ptr<class Worker>> _workers;
     SchedulerPolicy _policy;
     IdGenerator<WorkerId> _workerIdGenerator;
     LoggingContext &_loggingContext;
 
-    // std::atomic<SchedulerState> _state{SchedulerState::Created};
-
-    SchedulerControl _control;
+    WorkerExecutionContext _executionContext;
     void stop_request() ;
     void join_worker() const;
 
@@ -76,7 +78,7 @@ public:
     void exportTrace(std::ostream& out);
 
     void seal(Task* task);
-    void admit() { _control.admit(); }
+    void admit() { _executionContext.control.admit(); }
 
 };
 

@@ -3,13 +3,13 @@
 #include <pure/logging/logger.h++>
 #include "scheduler.h++"
 
-SchedulerPolicy::SchedulerPolicy(SchedulerControl& control, std::vector<std::unique_ptr<Worker>>& workers, spdlog::logger& logger, SchedulerStats& stats,  SchedulerConfiguration& config)
+SchedulerPolicy::SchedulerPolicy(std::vector<std::unique_ptr<Worker>>& workers, spdlog::logger& logger, SchedulerStats& stats,  SchedulerConfiguration& config, WorkerSignal& signal)
     : _config(config),
     _workers(workers),
     _globalInjectionQueue2(1024 * 64),
     _spdlogger(logger),
     _stats(stats),
-    _control(control)
+    _signal(signal)
 {
 }
 
@@ -63,7 +63,7 @@ Task* SchedulerPolicy::try_steal_from_global_queue(ChaseLevDeque<Task> &_deque) 
 
         if (!_deque.push(task)) {
             // Going back to global queue.
-            if (_globalInjectionQueue2.enqueue(task)) {
+            if (!_globalInjectionQueue2.enqueue(task)) {
             _spdlogger.error("global injection queue is full; task {} was not enqueued again.", task->taskId());
                 throw std::runtime_error("global injection queue is full");
             }
@@ -72,9 +72,10 @@ Task* SchedulerPolicy::try_steal_from_global_queue(ChaseLevDeque<Task> &_deque) 
         ++r;
     }
 
-    if (r > 0)
-        wake_one();
+    if (r > 0) _signal.notify_one();
+        // wake_one();
     return first;
+
 }
 
 std::shared_ptr<Task> SchedulerPolicy::try_find_task(ChaseLevDeque<Task> &_deque) {
@@ -88,28 +89,13 @@ std::shared_ptr<Task> SchedulerPolicy::try_find_task(ChaseLevDeque<Task> &_deque
     return nullptr;
 }
 
-void SchedulerPolicy::wake_one() {
-    _control._workEpoch.fetch_add(1);
-    // vs notify_one() ?????
-    // _workEpoch.notify_all();
-    _control._workEpoch.notify_one();
-}
-
-void SchedulerPolicy::wake_all() {
-    _control._workEpoch.fetch_add(1);
-    _control._workEpoch.notify_all();
-}
-
-void SchedulerPolicy::wait(size_t old) const {
-    _control._workEpoch.wait(old);
-}
 
 void SchedulerPolicy::submit(Task *task) {
     if (!_globalInjectionQueue2.enqueue(task)) {
         _spdlogger.error("global injection queue is full; task {} was not enqueued.", task->taskId());
         throw std::runtime_error("global injection queue is full");
     }
-    wake_one();
+    _signal.notify_one();
 }
 
 void SchedulerPolicy::enqueue_ready(Task *task) {
@@ -124,16 +110,4 @@ void SchedulerPolicy::enqueue_ready(Task *task) {
 spdlog::logger & SchedulerPolicy::spdlog_for_caller() {
     if (auto* w = current_worker()) return w->spdlogger();
     return _spdlogger;
-}
-
-size_t SchedulerPolicy::workEpoch() const {
-    return _control._workEpoch.load();
-}
-
-void SchedulerPolicy::admit() {
-    _control.admit();
-}
-
-void SchedulerPolicy::retire() {
-    _control.retire();
 }

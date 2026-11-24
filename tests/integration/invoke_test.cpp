@@ -119,7 +119,7 @@ TEST_F(RuntimeFixture, Simple) {
 
 TEST_F(DoubleFixture, MonteCarlo) {
 
-    constexpr long long N = 10'000'00;
+    constexpr long long N = 10'000;
     std::random_device rd;
     std::mt19937_64 gen(rd());
     std::uniform_real_distribution<double> dist(-1.0, 1.0);

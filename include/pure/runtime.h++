@@ -29,6 +29,7 @@ private:
 
     template<typename TaskT, typename T>
     void attach_dependency(TaskT& child, const OutputRef<T>& ref, size_t& i) {
+        // Add dependency in child
         child.depends_on(ref.getTask(), child.edge(i++));
     }
 public:
