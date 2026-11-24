@@ -20,14 +20,13 @@ private:
     struct Callable {
         virtual ~Callable() = default;
         virtual R invoke(Args... args) const = 0;
-        virtual std::shared_ptr<const Callable> clone() const = 0;
+        // virtual std::shared_ptr<const Callable> clone() const = 0;
     };
 
     template<typename F>
     struct CallableModel : public Callable {
         F func;
         R invoke(Args... args) const override { return func(std::forward<Args>(args)...); }
-        std::shared_ptr<const Callable> clone() const override { return std::make_shared<const CallableModel>(func); }
 
         explicit CallableModel(F&& func) : func(func) {}
         explicit CallableModel(const F& func) : func(func) {} // For Lambda
@@ -39,21 +38,12 @@ private:
 public:
 
     template<typename F>
-    PureFunc(const FuncId& id, F func) : _id(id), _callable(std::make_unique<CallableModel<F>>(std::forward<F>(func))) {}
+    PureFunc(const FuncId& id, F func) : _id(id), _callable(std::make_unique<CallableModel<F>>(std::move(func))) {}
 
-    PureFunc(const PureFunc& other) { if (other._callable){ _callable = other._callable->clone(); _id = other._id; } }
-
+    PureFunc(const PureFunc&) = default;
     PureFunc(PureFunc&& other) = default;
 
-    PureFunc& operator=(const PureFunc& other)   {
-        if (this != &other) {
-            PureFunc tmp(other);
-            std::swap(this->_id, tmp._id);
-            std::swap(this->_callable, tmp._callable);
-        }
-        return *this;
-    }
-
+    PureFunc& operator=(const PureFunc&) = default;
     PureFunc& operator=(PureFunc&& other) = default;
 
     // To make compiler know that the class is callable.
