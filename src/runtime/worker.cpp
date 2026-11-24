@@ -32,7 +32,9 @@ void Worker::task_run(Task *task) {
     }
 
     switch (result.status) {
-        case ExecResult::Status::Ok: break;
+        case ExecResult::Status::Ok:
+            _context.stats._completed.fetch_add(1, std::memory_order_relaxed);
+            break;
         case ExecResult::Status::Failed :
             _logger.error("task {} threw : {}", task->taskId(), describe(result.error));
             _context.stats._failed.fetch_add(1, std::memory_order_relaxed);
@@ -41,7 +43,6 @@ void Worker::task_run(Task *task) {
             _logger.error("task {} skipped: parents failed", task->taskId());
             break;
     }
-    _context.stats._completed.fetch_add(1, std::memory_order_relaxed);
     task->complete(_policy);
     _context.control.retire();
     _tracer.task_finished(task->taskId());
@@ -144,7 +145,6 @@ void Worker::start() {
 }
 
 void Worker::stop_request() {
-    // TODO : Create drain logic that is running workers until global and their local queue empty.
     _state.store(WorkerState::Stopped, std::memory_order_release);
     _is_stopped.store(true, std::memory_order_release);
     wake();

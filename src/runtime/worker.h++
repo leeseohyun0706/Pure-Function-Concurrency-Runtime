@@ -12,8 +12,8 @@
 
 
 
-struct SchedulerControl;
-struct SchedulerStats;
+// struct SchedulerControl;
+// struct SchedulerStats;
 struct WorkerExecutionContext;
 
 enum class WorkerState {
@@ -164,7 +164,7 @@ public:
         return _deque;
     }
     spdlog::logger& spdlogger() { return _logger; }
-    WorkerStats& stats() { return _stats; }
+    WorkerStats::SnapShot stats() const { return _stats.snapshot(); }
 };
 
 inline std::string_view format_as(WorkerState ws) {

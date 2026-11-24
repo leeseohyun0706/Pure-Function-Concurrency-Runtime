@@ -10,7 +10,6 @@
 #include <spdlog/spdlog.h>
 
 struct SchedulerStats;
-struct SchedulerControl;
 
 class SchedulerPolicy {
 private:

@@ -21,24 +21,25 @@ void Scheduler::seal(Task *task) {
 
 
 void Scheduler::start() {
-    if (_executionContext.control._state.load(std::memory_order_acquire) == SchedulerState::Started) {
+    if (_executionContext.control.state() == SchedulerState::Started) {
         throw std::runtime_error("The scheduler is already started.");
     }
     for (auto& worker : _workers) {
         worker->start();
     }
-    _executionContext.control._state.store(SchedulerState::Started, std::memory_order_release);
+    _executionContext.control.mark_started();
 }
 
 void Scheduler::shutdown() {
-    if (_executionContext.control._state.load(std::memory_order_acquire) == SchedulerState::Stopped) {
+    if (_executionContext.control.state() == SchedulerState::Stopped) {
         throw std::runtime_error("The scheduler is already stopped");
     }
 
     if (_config.shutdown_mode == SchedulerConfiguration::ShutdownMode::Drain) {
-        for (auto n = _executionContext.control._outstanding.load(); n != 0; n = _executionContext.control._outstanding.load()) {
-            _executionContext.control._outstanding.wait(n);
-        }
+        // for (auto n = _executionContext.control._outstanding.load(); n != 0; n = _executionContext.control._outstanding.load()) {
+        //     _executionContext.control._outstanding.wait(n);
+        // }
+        _executionContext.control.wait_until_drained();
     }
 
     spdlog::stopwatch sw;
@@ -52,7 +53,7 @@ void Scheduler::shutdown() {
     );
 
     for (auto& w : _workers) {
-        const auto& s = w->stats().snapshot();
+        const auto s = w->stats();
         auto att = s.stealAttempts;
         auto ok = s.stealSuccesses;
 
@@ -63,7 +64,7 @@ void Scheduler::shutdown() {
             s.parkedAttempts
         );
     }
-    _executionContext.control._state.store(SchedulerState::Stopped, std::memory_order_release);
+    _executionContext.control.mark_stopped();
 }
 
 void Scheduler::stop_request()  {
@@ -100,5 +101,5 @@ Scheduler::Scheduler(LoggingContext &logContext, SchedulerConfiguration &config,
 }
 
 Scheduler::~Scheduler() {
-    if (_executionContext.control._state.load(std::memory_order_acquire) != SchedulerState::Stopped) shutdown();
+    if (_executionContext.control.state() != SchedulerState::Stopped) shutdown();
 }

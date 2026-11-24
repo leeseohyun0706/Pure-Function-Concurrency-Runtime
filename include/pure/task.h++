@@ -145,6 +145,30 @@ protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTE
 
     OutputSlot<R> _outputs;
 
+    ExecResult finish_skipped(const std::exception_ptr &error) {
+        ExecResult result{ExecResult::Status::Skipped, error};
+        _outputs.fail(result.error);
+        _state.store(TaskState::Fail, std::memory_order_release);
+        return result;
+    }
+
+    ExecResult finish_failed(const std::exception_ptr &error) {
+        ExecResult result{ExecResult::Status::Failed, error};
+        _outputs.fail(result.error);
+        _state.store(TaskState::Fail, std::memory_order_release);
+        return result;
+    }
+
+    std::exception_ptr input_error() {
+        std::exception_ptr result{nullptr};
+        // Use std::apply to grap errors from inputs
+        if (_inputs.has_value())
+            std::apply([&](const auto&... in) {
+                ((result = result ? result : in.error()), ...);
+            }, _inputs.value());
+
+        return result;
+    }
 public:
 
 
@@ -174,38 +198,27 @@ public:
         // Task only runs when its state is Ready.
         if (state != TaskState::Ready) throw std::logic_error("Task state not ready");
 
-        // Use std::apply to grap errors from inputs
-        std::apply([&](const auto&... in) {
-            ((result.error = result.error ? result.error : in.error()), ...);
-        }, inputs);
-
-        if (result.error) {
+        if (const auto error = input_error()) {
             // If arguments have any errors, the task will be skipped.
-            result.status = ExecResult::Status::Skipped;
-            _outputs.fail(result.error);
-            _state.store(TaskState::Fail, std::memory_order_release);
-        }else {
-            try {
-                R output = std::apply(
-                        [this](const auto&... input) {
-                            return _function.invoke(input.resolve()...);
-                        },
-                        _inputs.value()
-                    );
-
-                _outputs.publish(std::move(output));
-                _state.store(TaskState::Completed, std::memory_order_release);
-            }catch (...) {
-                // If an exception is detected in a task, it will be failed.
-                result.status = ExecResult::Status::Failed;
-                result.error = std::current_exception(); // Is that safe?
-                _outputs.fail(result.error);
-                _state.store(TaskState::Fail, std::memory_order_release);
-            }
+            return finish_skipped(error);
         }
+        try {
+            R output = std::apply(
+                [this](const auto&... input) {
+                    return _function.invoke(input.resolve()...);
+                },
+                _inputs.value()
+            );
 
-        _inputs.reset(); // If it's not, inputs are holding their output refs until program end without freed.
-        return result;
+            _outputs.publish(std::move(output));
+            _state.store(TaskState::Completed, std::memory_order_release);
+            _inputs.reset(); // If it's not, inputs are holding their output refs until program end without freed.
+            return result;
+        }
+        catch (...) {
+            // If an exception is detected in a task, it will be failed.
+            return finish_failed(std::current_exception());
+        }
     }
 
     TaskState state() const {
