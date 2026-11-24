@@ -25,9 +25,9 @@ void Worker::task_run(Task *task) {
     _state.store(WorkerState::Running, std::memory_order_release);
     ExecResult result;
 
-    _recorder.instant(TraceEventKind::TaskStarted, task->taskId(), 0);
+    _tracer.task_started(task->taskId());
     {
-        TraceScope scope(_recorder, TraceEventKind::TaskExecution, task->taskId());
+        auto scope = _tracer.task_execution(task->taskId());
         result = task->execute();
     }
 
@@ -44,7 +44,8 @@ void Worker::task_run(Task *task) {
     _context.stats._completed.fetch_add(1, std::memory_order_relaxed);
     task->complete(_policy);
     _context.control.retire();
-    _recorder.instant(TraceEventKind::TaskFinished, task->taskId(), 0);
+    _tracer.task_finished(task->taskId());
+
     _stats._taskExecuted.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -76,16 +77,14 @@ void Worker::run() {
             _stats._stealAttempts.fetch_add(1, std::memory_order_relaxed);  // Use Relaxed for statistics because we don't need to load this during worker available.
 
             // Try to steal from another deque by SchedulerPolicy
-            _recorder.instant(TraceEventKind::StealAttempted, {0}, 0);
+            _tracer.steal_attempted();
             if (auto task = _policy.try_steal()) {
-                _recorder.instant(TraceEventKind::StealSucceed, task->taskId(), 0);
-
+                _tracer.steal_successed(task->taskId());
                 task_run(task.get());
                 _stats._stealSuccesses.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
-            _recorder.instant(TraceEventKind::StealFailed, {0}, 0);
-
+            _tracer.steal_failed();
 
             if (_is_stopped.load(std::memory_order_acquire))
                 break;
@@ -93,16 +92,15 @@ void Worker::run() {
             _stats._parkedAttempts.fetch_add(1, std::memory_order_relaxed);
             _state.store(WorkerState::Parked, std::memory_order_release);
 
-            _recorder.instant(TraceEventKind::WorkerWaitEntered, {0}, observed);
+            // _recorder.instant(TraceEventKind::WorkerWaitEntered, {0}, observed);
 
             // Run Stolen Task
             {
-                TraceScope scope(_recorder, TraceEventKind::WorkerParking, {0}, observed);
+                auto scope = _tracer.parking(observed);
                 // wait(observed) makes a current thread block as long as _wakeEpoch is the same as observed.
                 // What if this part be spin-lock?
                 _context.signal.wait(observed);
             }
-            _recorder.instant(TraceEventKind::WorkerWaitExited, {0}, _context.signal.snapshot());
 
 
         }
@@ -122,12 +120,12 @@ void Worker::join() {
 
 void Worker::wake() {
     _context.signal.notify_one();
-    _recorder.instant(TraceEventKind::WakeSignal, {0}, 0);
+    // _recorder.instant(TraceEventKind::WakeSignal, {0}, 0);
 }
 
 void Worker::submit(Task *task) {
     if (!task) return;
-    _recorder.instant(TraceEventKind::TaskSubmitted, task->taskId(), 0);
+    // _recorder.instant(TraceEventKind::TaskSubmitted, task->taskId(), 0);
     _deque.push(task);
     wake();
 }
@@ -156,6 +154,6 @@ std::span<const TraceEvent> Worker::records() const {
     if (!_is_stopped.load(std::memory_order_acquire)) {
         throw std::runtime_error("Worker::records() called on running state");
     }
-    return _records.events();
+    return _tracer.events();
 }
 

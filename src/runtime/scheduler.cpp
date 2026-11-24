@@ -3,7 +3,7 @@
 #include "runtime/worker.h++"
 #include <spdlog/stopwatch.h>
 #include <pure/logging/logger.h++>
-
+#include "tracing/trace_exporter.h++"
 
 void Scheduler::exportTrace(std::ostream &out) {
     TraceExporter exporter;
@@ -12,7 +12,7 @@ void Scheduler::exportTrace(std::ostream &out) {
         for (auto& event: worker->records())
             events.push_back(event);
     }
-        exporter.exportTrace(std::span<const TraceEvent>(events), out);
+    exporter.exportTrace(std::span<const TraceEvent>(events), out);
 }
 
 void Scheduler::seal(Task *task) {

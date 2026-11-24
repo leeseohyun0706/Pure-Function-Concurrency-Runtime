@@ -32,7 +32,8 @@ add_library(concal STATIC
         src/runtime/schedulerpolicy.cpp
         src/runtime/task.cpp
         src/runtime/worker.cpp
-        src/tracing/tracer.cpp
+        src/tracing/trace_recorder.cpp
+        src/tracing/trace_exporter.cpp
         src/runtime/runtime.cpp
 )
 

@@ -8,7 +8,7 @@
 
 #include "concurrency/chase_lev_deque.h++"
 #include "pure/task.h++"
-#include "tracing/tracer.h++"
+#include "tracing/worker_trace.h++"
 
 
 
@@ -67,8 +67,7 @@ private:
     SchedulerPolicy& _policy;
 
     // Debugging
-    WorkerRecordBuffer _records;
-    TraceRecorder _recorder;
+    WorkerTrace _tracer;
     spdlog::logger& _logger;
     WorkerExecutionContext& _context;
     void task_run(Task* task);
@@ -91,8 +90,7 @@ public:
     _workerId(workerId),
     _deque(_config.initial_deque_capacity),
     _policy(policy),
-    _records(tracingConfig.buffer_size),
-    _recorder(_records, _workerId, origin, tracingConfig),
+    _tracer(tracingConfig, workerId, origin),
     _logger(logger),
     _context(context)
     {
