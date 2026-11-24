@@ -3,7 +3,6 @@
 #ifndef CONCAL_RUNTIME_H
 #define CONCAL_RUNTIME_H
 #include <pure/logging/logger.h++>
-// #include <runtime/scheduler.h++>
 #include <pure/configuration.h++>
 #include <pure/task.h++>
 class Scheduler;
@@ -18,19 +17,26 @@ private:
     IdGenerator<FuncId> _funcIdGenerator;
     IdGenerator<TaskId> _taskIdGenerator;
 
-    // std::mutex _mutex;
     std::shared_ptr<spdlog::logger> _logger;
-    static void submit() {}
+
     void admit();
     void seal(Task& task);
 
-    template<typename TaskT, typename T>
-    void attach_dependency(TaskT&, const T&, size_t&) {}
+    template<typename R, typename... Params, typename... Args>
+    auto create_task(
+        const PureFunc<R(Params...)>& fn,
+        Args&&... args
+    ) {
+        // By using std::decay_t, it removes 'const' or '&' stuffs in the type.
+        using TaskType = PureFuncTask<R(Params...), std::decay_t<Params>...>;
+        return std::make_shared<TaskType>(_taskIdGenerator.next(), fn, args...);
+    }
 
-    template<typename TaskT, typename T>
-    void attach_dependency(TaskT& child, const OutputRef<T>& ref, size_t& i) {
-        // Add dependency in child
-        child.depends_on(ref.getTask(), child.edge(i++));
+    template<typename R, typename TaskT>
+    static OutputRef<R> make_output_ref(const std::shared_ptr<TaskT>& task) {
+        // Declare slot as std::shared_ptr to store output value.
+        auto slot = std::shared_ptr<OutputSlot<R>>(task, std::addressof(task->output()));
+        return OutputRef<R>{std::move(slot), task};
     }
 public:
 
@@ -52,20 +58,16 @@ public:
     template<typename R, typename... Args1, typename... Args2>
     auto invoke(const PureFunc<R(Args1...)>& fn, Args2&&... args) {
 
-        // By using std::decay_t, it removes 'const' or '&' stuffs in the type.
-        auto task =
-            std::make_shared<PureFuncTask<R(Args1...), std::decay_t<Args1>...>>(_taskIdGenerator.next(), fn, args...);
+        auto task = create_task(fn, args...);
 
         admit();
         task->pin();
 
-        size_t edge = 0;
         // Add dependency for Child Task indicating reference input.
-        (attach_dependency(*task, args, edge), ...);
-        // Declare slot as std::shared_ptr to store output value.
-        std::shared_ptr<OutputSlot<R>> slot(task, &task->output());
+        task->attach_dependencies(args...);
+        auto output = make_output_ref<R>(task);
         seal(*task);
-        return OutputRef<R>{slot, task};
+        return output;
     }
 
     ~Runtime();

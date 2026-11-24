@@ -95,6 +95,8 @@ public:
     }
     spdlog::logger& spdlogger() { return _logger; }
     WorkerStats::Snapshot stats() const { return _stats.snapshot(); }
+
+    bool belongs_to(SchedulerPolicy& policy) const { return &policy == &_policy;}
 };
 
 inline std::string_view format_as(WorkerState ws) {

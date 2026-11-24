@@ -90,7 +90,7 @@ void SchedulerPolicy::inject(Task *task) {
 }
 
 void SchedulerPolicy::enqueue_ready(Task *task) {
-    if (auto*w = current_worker()) {
+    if (auto*w = current_worker(); w &&  w->belongs_to(*this)) {
         w->submit(task);
     }
     else inject(task);

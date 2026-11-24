@@ -163,10 +163,26 @@ protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTE
 
         return result;
     }
+
+    template<typename T>
+    void attach_dependency(
+        const T&, size_t&
+    ) {}
+
+    template<typename T>
+    void attach_dependency(const OutputRef<T>& ref, size_t& index) {
+        depends_on(ref.getTask(), _edges[index++]);
+    }
 public:
 
+    template<typename ... Inputs>
+    void attach_dependencies(const Inputs&... inputs) {
+        static_assert(sizeof...(Inputs) == sizeof...(Args));
 
-    EdgeNode& edge(size_t i)  { return _edges[i]; }
+        size_t index = 0;
+        (attach_dependency(inputs, index), ...);
+    }
+
     OutputSlot<R>& output() noexcept { return _outputs;}
 
 
