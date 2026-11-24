@@ -45,8 +45,39 @@ void Worker::task_run(Task *task) {
     task->complete(_policy);
     _context.control.retire();
     _tracer.task_finished(task->taskId());
+    _stats.task_executed();
+}
 
-    _stats._taskExecuted.fetch_add(1, std::memory_order_relaxed);
+std::shared_ptr<Task> Worker::find_task() {
+    // Try pop from local queue and global queue
+    if (auto task = _policy.try_find_task(_deque)) {
+        return task;
+    }
+
+    _stats.steal_attempted();
+    _tracer.steal_attempted();
+    // Try to steal from another deque by SchedulerPolicy
+    if (auto task = _policy.try_steal()) {
+        _stats.steal_succeeded();
+        _tracer.steal_successed(task->taskId());
+        return task;
+    }
+    _tracer.steal_failed();
+    return nullptr;
+}
+
+void Worker::park(uint64_t epoch) {
+    _stats.park_attempted();
+    _state.store(WorkerState::Parked, std::memory_order_release);
+
+    // Run Stolen Task
+    {
+        auto scope = _tracer.parking(epoch);
+        // wait(observed) makes a current thread block as long as _wakeEpoch is the same as observed.
+        // What if this part be spin-lock?
+        _context.signal.wait(epoch);
+    }
+
 }
 
 /*
@@ -67,48 +98,22 @@ void Worker::run() {
 
             _state.store(WorkerState::Searching, std::memory_order_release);
 
-            // Try to pop from local worker deque.
-            if (auto task = _policy.try_find_task(_deque)) {
+            if (auto task = find_task()) {
                 task_run(task.get());
                 continue;
             }
-
-            // If the worker supports capturing stats during runtime, it would be needed to change for lock-free stat structure or special something.
-            _stats._stealAttempts.fetch_add(1, std::memory_order_relaxed);  // Use Relaxed for statistics because we don't need to load this during worker available.
-
-            // Try to steal from another deque by SchedulerPolicy
-            _tracer.steal_attempted();
-            if (auto task = _policy.try_steal()) {
-                _tracer.steal_successed(task->taskId());
-                task_run(task.get());
-                _stats._stealSuccesses.fetch_add(1, std::memory_order_relaxed);
-                continue;
-            }
-            _tracer.steal_failed();
 
             if (_is_stopped.load(std::memory_order_acquire))
                 break;
 
-            _stats._parkedAttempts.fetch_add(1, std::memory_order_relaxed);
-            _state.store(WorkerState::Parked, std::memory_order_release);
-
-            // _recorder.instant(TraceEventKind::WorkerWaitEntered, {0}, observed);
-
-            // Run Stolen Task
-            {
-                auto scope = _tracer.parking(observed);
-                // wait(observed) makes a current thread block as long as _wakeEpoch is the same as observed.
-                // What if this part be spin-lock?
-                _context.signal.wait(observed);
-            }
-
-
+            park(observed);
         }
+
         auto exec_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(sw.elapsed());
-        _stats._totalExecutionNs.store(exec_ns.count(), std::memory_order_relaxed);
+        _stats.total_execution_ns(exec_ns.count());
         SPDLOG_LOGGER_DEBUG(&_logger,
             "thread exiting, executed={} exec_time={}ms",
-            _stats._taskExecuted.load(std::memory_order_relaxed), sw.elapsed_ms().count());
+            _stats.snapshot().taskExecuted, sw.elapsed_ms().count());
         tls_worker = nullptr;
 }
 

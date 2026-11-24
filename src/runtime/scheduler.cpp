@@ -52,15 +52,15 @@ void Scheduler::shutdown() {
     );
 
     for (auto& w : _workers) {
-        const auto& s = w->stats();
-        auto att = s._stealAttempts.load(std::memory_order_relaxed);
-        auto ok = s._stealSuccesses.load(std::memory_order_relaxed);
+        const auto& s = w->stats().snapshot();
+        auto att = s.stealAttempts;
+        auto ok = s.stealSuccesses;
 
         _logger.info("worker {} : executed={} steals={}/{} ({:.1f}%) parks={}",
             w->workerId(),
-            s._taskExecuted.load(std::memory_order_relaxed),
+            s.taskExecuted,
             ok, att, att ? 100.0 * ok / att : 0.0,
-            s._parkedAttempts.load(std::memory_order_relaxed)
+            s.parkedAttempts
         );
     }
     _executionContext.control._state.store(SchedulerState::Stopped, std::memory_order_release);
