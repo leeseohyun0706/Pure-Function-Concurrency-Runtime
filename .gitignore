@@ -17,3 +17,5 @@ study_notes/the_curse_of_stl.md
 /traces/
 /logs/
 /output*.json
+
+main.cpp
