@@ -4,11 +4,12 @@
 A work-stealing task runtime that runs a DAG of pure functions on a pool of worker threads.
 
 ### System Requirements
-| Name         | Version      |
-|--------------|--------------|
-| C++ Compiler | C++20        |
-| cmake        | 4.2 or newer |
-| conan        | 2.x          |
+| Name         | Version            |
+|--------------|--------------------|
+| C++ Compiler | C++20 (LLVM/clang) |
+| cmake        | 4.2 or newer       |
+| Ninja        | Required           |
+| conan        | 2.x                |
 
 ### Package Requirements
 
@@ -30,14 +31,57 @@ brew install conan        # Package management
 conan profile detect --force
 ```
 
-## Build
+### CMake Presets
+
+Build configurations are defined in `CmakePresets.json`.
+
+| Preset  | Build Type     | Description                  |
+|---------|----------------|------------------------------|
+| debug   | Debug          | Development and debugging    |
+| release | Release        | Optimized executables        |
+| tsan    | RelWithDebInfo | ThreadSanitizer-enable build |
+
+Make sure that the preset list is available.
+```bash
+cmake --list-presets
+cmake --build --list-presets
+ctest --list-presets
+```
+
+## Build With Configuration
+
+### Debug Build
 
 ```bash
-cmake -S . -B build/debug -G Ninja \
-      -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake
-cmake --build build/debug
+cmake --preset debug
+cmake --build --preset debug
 ```
+
+### Release Build
+
+```bash
+cmake --preset release
+cmake --build --preset release
+```
+
+### ThreadSanitizer Build
+
+```bash
+cmake --preset tsan
+cmake --build --preset tsan
+```
+
+## Tests
+
+Tests are implemented using `GoogleTest` and executed through `CTtest`.
+> Make sure the corresponding build preset has been built before running tests.
+
+```bash
+ctest --preset debug
+ctest --preset release
+ctest --preset tsan
+```
+
 ## Quick Example
 
 ```cpp
