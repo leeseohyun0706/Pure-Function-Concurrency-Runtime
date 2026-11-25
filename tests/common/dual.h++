@@ -21,17 +21,17 @@ struct Dual {
         };
     }
 
-    static Dual mul( Dual a,  Dual b) {
+    static Dual mul(Dual a,  Dual b) {
         return Dual{
             a.value * b.value,
-                a.derivative * b.value + a.value * b.derivative
+                a.derivative * b.value + a.value * b.derivative // Product rule
             };
     }
 
     static Dual div( Dual a,  Dual b) {
         return Dual{
             a.value / b.value,
-                (a.derivative * b.value - a.value * b.derivative) / std::pow(b.value, 2)
+                (a.derivative * b.value - a.value * b.derivative) / std::pow(b.value, 2) // Quotient rule
             };
     }
 
@@ -59,14 +59,14 @@ struct Dual {
     static Dual exp(Dual x) {
         return Dual{
             std::exp(x.value),
-            std::exp(x.value) * x.derivative
+            std::exp(x.value) * x.derivative // dy[e^x] = e^x * dx
         };
     }
 
     static Dual sqrt(Dual x) {
         return Dual{
         std::sqrt(x.value),
-            (1 / (2 * std::sqrt(x.value))) * x.derivative
+            (1 / (2 * std::sqrt(x.value))) * x.derivative // dy[sqrt(x)] = dy[x^(1/2)] = 1/(2*sqrt(x)) * dx
         };
     }
 

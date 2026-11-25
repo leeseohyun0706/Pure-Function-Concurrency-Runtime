@@ -8,6 +8,7 @@
 #include "pure/input.h++"
 #include "func.h++"
 #include "id.h++"
+#include <pure/detail/successor_list.h++>
 
 using SlotType = size_t;
 
@@ -28,58 +29,6 @@ struct ExecResult {
         Skipped
     } status{Status::Ok};
     std::exception_ptr error;
-};
-class Task;
-
-// Can I utilize memoization?
-struct EdgeNode {
-    Task* child = nullptr; // Vertex
-    EdgeNode* next = nullptr; // Link
-};
-
-// Single Lock-Free Linked List to manage input dependency
-class SuccessorList {
-private:
-    static inline EdgeNode _closed{}; // Static reference of last edge (to avoid using nullptr).
-
-    std::atomic<EdgeNode*> _head{nullptr};
-
-    static EdgeNode* closed() noexcept { return &_closed; }
-
-public:
-    SuccessorList() = default;
-    SuccessorList(const SuccessorList&) = delete;
-    SuccessorList& operator=(const SuccessorList&) = delete;
-
-    bool try_attach(EdgeNode& node) {
-        auto* head = _head.load(std::memory_order_acquire);
-
-        while (head != closed()) {
-            node.next = head;
-
-            if (_head.compare_exchange_weak(head, &node, std::memory_order_acq_rel, std::memory_order_acquire)) return true;
-        }
-
-        return false;
-    }
-
-    template<typename Visitor> requires std::is_invocable_v<Visitor&, Task&>
-    bool close_and_visit(Visitor&& visit) {
-
-        auto *node = _head.exchange(closed(), std::memory_order_acq_rel);
-
-        if (node == closed()) return false;
-
-        while (node != nullptr) {
-            auto* next = node->next;
-            auto* child = node->child;
-
-            visit(*child);
-
-            node = next;
-        }
-        return true;
-    }
 };
 
 /*
@@ -171,7 +120,7 @@ protected: // I would ask for c++ WHAT ACTUAL WORTH TO DISTINGUISH BETWEEN PROTE
 
     template<typename T>
     void attach_dependency(const OutputRef<T>& ref, size_t& index) {
-        depends_on(ref.getTask(), _edges[index++]);
+        depends_on(ref.get_task(), _edges[index++]);
     }
 public:
 

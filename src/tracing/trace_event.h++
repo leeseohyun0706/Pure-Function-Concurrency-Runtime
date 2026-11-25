@@ -2,7 +2,7 @@
 #ifndef CONCAL_TRACE_EVENT_H
 #define CONCAL_TRACE_EVENT_H
 #include <pure/id.h++>
-
+#include <string>
 
 // Event Shape in which be expressed.
 enum class TraceEventShape : uint8_t {

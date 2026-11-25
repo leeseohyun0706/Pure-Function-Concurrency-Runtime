@@ -4,10 +4,7 @@
 
 #include "math_helper.h++"
 #include "runtime_fixture.h++"
-#include "../../include/pure/runtime.h++"
-#include "../common/dual.h++"
-
-double _square(double x) { return x * x; }
+#include "pure/runtime.h++"
 
 
 /*
@@ -81,7 +78,7 @@ TEST_F(RuntimeFixture, Granuly) {
     }
 
     for (uint32_t i = 0; i < 10; ++i) {
-        outputs[i].wait_and_get();
+        DoNotOptimize(*outputs[i].wait_and_get());
     }
 }
 
@@ -97,29 +94,29 @@ TEST_F(RuntimeFixture, FailurePropagates) {
     EXPECT_THROW(a.wait_and_get(), std::runtime_error);
 }
 
-TEST_F(RuntimeFixture, Simple) {
-
-    constexpr long long N = 10'000'000;
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_real_distribution<double> dist(-1.0, 1.0);
-
-    long long inside_circle = 0;
-    for (long long i = 0; i < N; ++i) {
-        double x = dist(gen);
-        double y = dist(gen);
-        if (x * x + y * y <= 1.0) {
-            ++inside_circle;
-        }
-    }
-
-    double pi_estimate = 4.0 * static_cast<double>(inside_circle) / static_cast<double>(N);
-    std::cout << "Estimated pi: " << pi_estimate << '\n';
-}
+// TEST_F(RuntimeFixture, Simple) {
+//
+//     constexpr long long N = 10'000'000;
+//     std::random_device rd;
+//     std::mt19937_64 gen(rd());
+//     std::uniform_real_distribution<double> dist(-1.0, 1.0);
+//
+//     long long inside_circle = 0;
+//     for (long long i = 0; i < N; ++i) {
+//         double x = dist(gen);
+//         double y = dist(gen);
+//         if (x * x + y * y <= 1.0) {
+//             ++inside_circle;
+//         }
+//     }
+//
+//     double pi_estimate = 4.0 * static_cast<double>(inside_circle) / static_cast<double>(N);
+//     std::cout << "Estimated pi: " << pi_estimate << '\n';
+// }
 
 TEST_F(DoubleFixture, MonteCarlo) {
 
-    constexpr long long N = 10'000;
+    constexpr long long N = 10'000'0;
     std::random_device rd;
     std::mt19937_64 gen(rd());
     std::uniform_real_distribution<double> dist(-1.0, 1.0);
@@ -137,10 +134,13 @@ TEST_F(DoubleFixture, MonteCarlo) {
     }
 
     for (auto& r : outputs) {
-        if (*r.wait_and_get());
+        DoNotOptimize(*r.wait_and_get());
     }
 
     double pi_estimate = 4.0 * static_cast<double>(inside_circle.load()) / static_cast<double>(N);
     std::cout << "Estimated pi: " << pi_estimate << '\n';
 }
+
+
+
 INSTANTIATE_TEST_SUITE_P(Sizes, RuntimeParamFixture, ::testing::Values(1, 10, 1000));

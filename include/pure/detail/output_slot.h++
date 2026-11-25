@@ -2,6 +2,8 @@
 #ifndef CONCAL_OUTPUT_SLOT_H
 #define CONCAL_OUTPUT_SLOT_H
 #include <memory>
+#include <exception>
+#include <atomic>
 
 enum class ResultState {
     Empty,
@@ -14,17 +16,24 @@ enum class ResultState {
 template<typename T>
 class OutputSlot {
 private:
-    T _slot;
+    std::optional<T> _slot;
     std::exception_ptr _error;
     std::atomic<ResultState> _state{ResultState::Empty};
 
-public:
-    void publish(T slot) {
-        if (_state.load(std::memory_order_acquire) != ResultState::Empty)
-            return;
-        _slot = slot;
-        _state.store(ResultState::Ready, std::memory_order_release);
+    void publish_state(ResultState state) {
+        _state.store(state, std::memory_order_release);
         _state.notify_all();
+    }
+
+public:
+
+    ResultState state() const { return _state.load(std::memory_order_acquire); }
+
+    void publish(T slot) {
+        if (state() != ResultState::Empty)
+            return;
+        _slot.emplace(std::move(slot));
+        publish_state(ResultState::Ready);
     }
 
     void wait() const {
@@ -33,22 +42,23 @@ public:
 
     // read_ready() returns instant slot value or throw error if state is not ready or contains error
     const T& read_ready() const {
-        auto s = _state.load(std::memory_order_acquire);
-
-        if (s == ResultState::Failed) std::rethrow_exception(_error);
-
-        if (s != ResultState::Ready) throw std::logic_error("Output is not ready");
-
-        return _slot;
+        switch (state()) {
+            case ResultState::Ready:
+                return *_slot;
+            case ResultState::Failed:
+                std::rethrow_exception(_error);
+            case ResultState::Empty:
+                throw std::logic_error("Output is not ready");
+        }
+        throw std::logic_error("Invalid result state");
     }
 
     // Set its error from the given argument
     void fail(std::exception_ptr e) {
-        if (_state.load(std::memory_order_acquire) != ResultState::Empty) return;
+        if (state() != ResultState::Empty) return;
 
         _error = std::move(e);
-        _state.store(ResultState::Failed, std::memory_order_release);
-        _state.notify_all();
+        publish_state(ResultState::Failed);
     }
 
 
@@ -57,15 +67,8 @@ public:
     std::exception_ptr error() const { return failed() ? _error : nullptr; }
 
     const T& get() const {
-        while (true) {
-            auto s = _state.load(std::memory_order_acquire);
-
-            if (s == ResultState::Ready)
-                return _slot;
-            if (s == ResultState::Failed)
-                throw std::logic_error("Output occurs exception");
-            _state.wait(ResultState::Empty, std::memory_order_acquire);
-        }
+        wait();
+        return read_ready();
     }
 
 };

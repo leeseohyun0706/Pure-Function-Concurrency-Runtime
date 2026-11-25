@@ -2,9 +2,10 @@
 #ifndef CONCAL_CONFIGURATION_H
 #define CONCAL_CONFIGURATION_H
 #include <cstdint>
-#include <libenvpp/env.hpp>
+#include <envcfg/envcfg.h++>
 #include <thread>
 #include <iostream>
+#include <unordered_map>
 
 
 template<typename T>
@@ -26,9 +27,9 @@ struct WorkerConfiguration {
     static WorkerConfiguration load_from_env() {
         WorkerConfiguration config;
 
-        config.initial_deque_capacity = env::get_or<uint32_t>("FFF_WORKER_INITIAL_DEQUE_CAPACITY", 32);
-        config.idle = env::get_or<IdleStrategy>("FFF_WORKER_IDLE_STRATEGY", IdleStrategy::Park);
-        config.spin_before_park = env::get_or<uint32_t>("FFF_SPIN_BEFORE_PARK", 0);
+        config.initial_deque_capacity = envcfg::get<uint32_t>("FFF_WORKER_INITIAL_DEQUE_CAPACITY", 32);
+        config.idle = envcfg::get<IdleStrategy>("FFF_WORKER_IDLE_STRATEGY", IdleStrategy::Park);
+        config.spin_before_park = envcfg::get<uint32_t>("FFF_SPIN_BEFORE_PARK", 0);
 
         return config;
     }
@@ -51,10 +52,10 @@ struct SchedulerConfiguration {
 
         SchedulerConfiguration config;
         config.worker = WorkerConfiguration::load_from_env();
-        config.worker_size = env::get_or<uint32_t>("FFF_WORKER_SIZE", std::max(1u, std::thread::hardware_concurrency()));
-        config.work_stealing = env::get_or<bool>("FFF_WORK_STEALING_ENABLE", true);
-        config.global_queue_batch_size = env::get_or<uint32_t>("FFF_GLOBAL_DEQUE_BATCH_SIZE", 8);
-        config.shutdown_mode = env::get_or<ShutdownMode>("FFF_SCHEDULER_SHUTDOWN_MODE", ShutdownMode::Drain);
+        config.worker_size = envcfg::get<uint32_t>("FFF_WORKER_SIZE", std::max(1u, std::thread::hardware_concurrency()));
+        config.work_stealing = envcfg::get<bool>("FFF_WORK_STEALING_ENABLE", true);
+        config.global_queue_batch_size = envcfg::get<uint32_t>("FFF_GLOBAL_DEQUE_BATCH_SIZE", 8);
+        config.shutdown_mode = envcfg::get<ShutdownMode>("FFF_SCHEDULER_SHUTDOWN_MODE", ShutdownMode::Drain);
         return config;
     }
 };
@@ -71,8 +72,8 @@ struct TracingConfiguration {
     static TracingConfiguration load_from_env() {
         TracingConfiguration config;
 
-        config.enable = env::get_or<bool>("FFF_TRACING_ENABLE", true);
-        config.buffer_size = env::get_or<uint32_t>("FFF_TRACING_BUFFER_SIZE", 4096 * 2);
+        config.enable = envcfg::get<bool>("FFF_TRACING_ENABLE", true);
+        config.buffer_size = envcfg::get<uint32_t>("FFF_TRACING_BUFFER_SIZE", 4096 * 2);
         return config;
     }
 };
@@ -99,9 +100,9 @@ struct LoggingConfiguration {
 
     static LoggingConfiguration load_from_env() {
         LoggingConfiguration config;
-        config.enable = env::get_or<bool>("FFF_LOGGING_ENABLE", true);
-        config.level = env::get_or<Level>("FFF_LOGGING_LEVEL", Level::Info);
-        config.flush_on = env::get_or<Level>("FFF_LOGGING_FLUSH_LEVEL", Level::Warn);
+        config.enable = envcfg::get<bool>("FFF_LOGGING_ENABLE", true);
+        config.level = envcfg::get<Level>("FFF_LOGGING_LEVEL", Level::Info);
+        config.flush_on = envcfg::get<Level>("FFF_LOGGING_FLUSH_LEVEL", Level::Warn);
         return config;
     }
 
@@ -162,28 +163,28 @@ inline std::optional<WorkerConfiguration::IdleStrategy> from_string(const std::s
 
 
 
-namespace env {
+namespace envcfg {
     template<>
-    struct default_parser<LoggingConfiguration::Level> {
-        LoggingConfiguration::Level operator()(const std::string_view str) const {
+    struct Parser<LoggingConfiguration::Level> {
+        static LoggingConfiguration::Level parse(std::string_view str)  {
             auto r = from_string<LoggingConfiguration::Level>(str);
-            if (!r) throw parser_error("Invalid Logging Level");
+            if (!r) throw std::invalid_argument("Invalid Logging Level");
             return r.value();
         }
     };
     template<>
-    struct default_parser<SchedulerConfiguration::ShutdownMode> {
-        SchedulerConfiguration::ShutdownMode operator()(const std::string_view str) const {
+    struct Parser<SchedulerConfiguration::ShutdownMode> {
+        static SchedulerConfiguration::ShutdownMode parse( std::string_view str)  {
             auto r = from_string<SchedulerConfiguration::ShutdownMode>(str);
-            if (!r) throw parser_error("Invalid Shutdown Mode");
+            if (!r) throw std::invalid_argument("Invalid Shutdown Mode");
             return r.value();
         }
     };
     template<>
-    struct default_parser<WorkerConfiguration::IdleStrategy> {
-        WorkerConfiguration::IdleStrategy operator()(const std::string_view str) const {
+    struct Parser<WorkerConfiguration::IdleStrategy> {
+        static WorkerConfiguration::IdleStrategy parse( std::string_view str)  {
             auto r = from_string<WorkerConfiguration::IdleStrategy>(str);
-            if (!r) throw parser_error("Invalid Idle Strategy");
+            if (!r) throw std::invalid_argument("Invalid Idle Strategy");
             return r.value();
         }
     };

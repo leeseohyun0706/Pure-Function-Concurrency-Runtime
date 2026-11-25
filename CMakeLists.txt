@@ -11,7 +11,6 @@ find_package(Threads REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
-find_package(libenvpp CONFIG REQUIRED)
 
 # Options
 option(FFF_BUILD_TESTS "Build unit, integration, and stress tests" ${PROJECT_IS_TOP_LEVEL})
@@ -48,13 +47,23 @@ target_compile_options(concal PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- /Zc:__cplusplus /wd4324>   # 4324 = alignas padding note
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra>)
 
+add_library(concal_sanitizer INTERFACE)
+if(FFF_TSAN)
+    target_compile_options(concal_sanitizer INTERFACE
+    -fsanitize=thread -fno-omit-frame-pointer -g
+    )
+    target_link_options(concal_sanitizer INTERFACE
+            -fsanitize=thread
+    )
+endif()
+
 
 target_link_libraries(concal
         PRIVATE
         concal_concurrency
         nlohmann_json::nlohmann_json
         Threads::Threads
-        PUBLIC spdlog::spdlog libenvpp::libenvpp
+        PUBLIC concal_sanitizer spdlog::spdlog
 )
 
 target_compile_definitions(concal PRIVATE
@@ -66,6 +75,8 @@ if(FFF_BUILD_TESTS OR FFF_BUILD_BENCHMARKS)
 endif()
 
 
+
 add_executable(quick_example example/quick_example.cpp)
 target_link_libraries(quick_example PUBLIC concal)
 target_include_directories(quick_example PUBLIC concal_concurrency)
+

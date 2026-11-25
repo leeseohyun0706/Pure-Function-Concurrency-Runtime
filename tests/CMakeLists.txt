@@ -3,7 +3,7 @@
 find_package(GTest CONFIG REQUIRED)
 
 include(GoogleTest)
-
+set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
 function(c_add_test name label)
     add_executable(${name} ${ARGN})
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
@@ -17,9 +17,12 @@ c_add_test(integration_tests integration integration/invoke_test.cpp
 c_add_test(stress_tests stress
         stress/massive_dag_test.cpp)
 
-c_add_test(unit_tests unit unit/concurrency/deque_test.cpp)
+c_add_test(unit_tests unit
+        unit/concurrency/deque_test.cpp
+        unit/data/output_slot_test.cpp
+)
 
-find_package(benchmark CONFIG REQUIRED)
+#find_package(benchmark CONFIG REQUIRED)
 
 #add_executable(stress_bench benchmark/stress_bench.cpp)
 #target_include_directories(stress_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)

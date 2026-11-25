@@ -14,6 +14,3 @@ TEST(DequeTests, BasicLogic) {
     ASSERT_TRUE(deque.empty());
 }
 
-
-TEST(DequeTests, PushPop) {
-}

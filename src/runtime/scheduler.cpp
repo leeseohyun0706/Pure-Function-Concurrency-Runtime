@@ -36,9 +36,6 @@ void Scheduler::shutdown() {
     }
 
     if (_config.shutdown_mode == SchedulerConfiguration::ShutdownMode::Drain) {
-        // for (auto n = _executionContext.control._outstanding.load(); n != 0; n = _executionContext.control._outstanding.load()) {
-        //     _executionContext.control._outstanding.wait(n);
-        // }
         _executionContext.control.wait_until_drained();
     }
 

@@ -11,7 +11,7 @@ class MPMCQueue
 {
 public:
 	explicit MPMCQueue(size_t buffer_size)
-		: _buffer(new cell_t[buffer_size])
+		: _buffer(new Cell[buffer_size])
 		, _buffer_mask(buffer_size - 1)
 	{
 		assert((buffer_size >= 2) && ((buffer_size & (buffer_size - 1)) == 0));
@@ -30,14 +30,14 @@ public:
 
 	bool enqueue(T const& data)
 	{
-		cell_t* cell;
+		Cell* cell;
 		size_t pos = _tail.load(std::memory_order_relaxed);
 
 		for (;;)
 		{
 			cell = &_buffer[pos & _buffer_mask];
 			size_t seq = cell->sequence_.load(std::memory_order_acquire);
-			intptr_t dif = (intptr_t)seq - (intptr_t)pos;
+			intptr_t dif = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos);
 
 			if (dif == 0)
 			{
@@ -58,7 +58,7 @@ public:
 
 	bool dequeue(T& data)
 	{
-		cell_t* cell;
+		Cell* cell;
 		size_t pos = _head.load(std::memory_order_relaxed);
 
 		for (;;)
@@ -66,7 +66,7 @@ public:
 			cell = &_buffer[pos & _buffer_mask];
 			size_t seq =
 				cell->sequence_.load(std::memory_order_acquire);
-			intptr_t dif = (intptr_t)seq - (intptr_t)(pos + 1);
+			intptr_t dif = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos + 1);
 
 			if (dif == 0)
 			{
@@ -87,16 +87,16 @@ public:
 	}
 
 private:
-	struct cell_t
+	struct Cell
 	{
-		std::atomic<size_t>		sequence_;
-		T					data_;
+		std::atomic<size_t>	sequence_;
+		T data_;
 	};
 
 	static constexpr size_t cacheline_size = 64;
 	typedef char cacheline_pad_t[cacheline_size];
 	cacheline_pad_t _pad0;
-	cell_t* _buffer;
+	Cell* _buffer;
 	const size_t _buffer_mask;
 	cacheline_pad_t _pad1;
 	std::atomic<size_t> _tail;

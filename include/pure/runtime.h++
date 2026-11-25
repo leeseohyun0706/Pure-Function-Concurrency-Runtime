@@ -35,7 +35,7 @@ private:
     template<typename R, typename TaskT>
     static OutputRef<R> make_output_ref(const std::shared_ptr<TaskT>& task) {
         // Declare slot as std::shared_ptr to store output value.
-        auto slot = std::shared_ptr<OutputSlot<R>>(task, std::addressof(task->output()));
+        auto slot = std::shared_ptr<const OutputSlot<R>>(task, std::addressof(task->output()));
         return OutputRef<R>{std::move(slot), task};
     }
 public:

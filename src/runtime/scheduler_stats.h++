@@ -11,6 +11,7 @@ class alignas(64) SchedulerStats {
     std::atomic<uint64_t> _skipped{0};
     std::atomic<uint64_t> _failed{0};
     public:
+
     struct Snapshot {
         uint64_t submitted;
         uint64_t started;

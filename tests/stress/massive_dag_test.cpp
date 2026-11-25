@@ -3,17 +3,11 @@
 #include <pure/runtime.h++>
 #include "dual.h++"
 
-inline void burn1(int work) {
-    double acc = 1.0;
-    for (int i = 0; i < work; ++i) acc = acc * 1.0000001 + 1e-9;
-}
-
-
 TEST_P(DualParamFixture, MassiveDAG) {
     const auto N = GetParam();
 
     auto fn = runtime.func_register([] (Dual x, int k) -> Dual {
-        burn1(10000);
+        burn_iterations(10000);
         return {
             std::sin(k * x.value) / k,
                 std::cos(k * x.value) * x.derivative
@@ -54,7 +48,7 @@ TEST_P(DualParamFixture, MassiveDAG) {
         result = outputs.front();
     }
 
-    EXPECT_NEAR(result->wait_and_get()->value, 0.0, 1e-10);
+    EXPECT_NEAR(result->wait_and_get()->value, 0.0, 1e-10); // Given inaccuracy of floating-point in double type, I use EXPECT_NEAR
     EXPECT_NEAR(result->wait_and_get()->derivative, double(N), 1e-8);
 
 }
@@ -65,11 +59,6 @@ Dual testFunc(Dual x) {
     return Dual::mul(Dual::add(Dual::pow(x, 2), Dual::sin(x)), Dual::add(Dual::exp(x), Dual::pow(x, 3)));
 }
 
-
-inline void burn(int work) {
-    double acc = 1.0;
-    for (int i = 0; i < work; ++i) acc = acc * 1.0000001 + 1e-9;
-}
 
 
 TEST_P(DualParamFixture, DiffTests) {

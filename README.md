@@ -18,7 +18,6 @@ A work-stealing task runtime that runs a DAG of pure functions on a pool of work
 | nlohmann_json | 3.12.0  |
 | gtest         | 1.18.0  |
 | benchmaek     | 1.9.4   |
-| libenvpp      | 1.5.0   |
 
 ## Installation Setup
 
