@@ -2,27 +2,54 @@
 #include <fstream>
 #include <random>
 
-#include "math_helper.h++"
-#include "runtime_fixture.h++"
+#include "math_fixture.h++"
 #include "pure/runtime.h++"
 
+TEST_P(RuntimeMatrixFixture, TaskIndependency) {
+    const auto n = GetParam().task_count;
+
+    auto square = runtime->func_register(
+        [](uint64_t x) {
+            return x * x;
+        }
+    );
+
+    std::vector<OutputRef<uint64_t>> outputs;
+    outputs.reserve(n);
+
+    for (uint64_t i = 0; i < n; ++i) {
+        outputs.push_back(
+            runtime->invoke(square, i)
+        );
+    }
+
+    for (uint64_t i = 0; i < n; ++i) {
+        ASSERT_EQ(*outputs[i].wait_and_get(), i * i)
+            << "Task index: " << i;
+    }
+}
 
 /*
  * Testing N amounts of x^2 tasks through runtime and verify correctness.
  */
-TEST_P(RuntimeParamFixture, SquareTest) {
+TEST_P(RuntimeMatrixFixture, IndependentTasksReturnCorrectValue) {
+    const auto count = GetParam().task_count;
 
-    auto square = runtime.func_register([](double x) { return x * x; });
+    auto square = runtime->func_register([](double x) { return x * x; });
 
     std::vector<OutputRef<double>> outputs;
-    for (int i = 0; i < GetParam(); ++i) {
-        auto r = runtime.invoke(square, static_cast<double>(i));
+    outputs.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        auto r = runtime->invoke(square, static_cast<double>(i));
         outputs.push_back(r);
     }
 
-    for (int i = 0; i < GetParam(); ++i) {
+    for (int i = 0; i < count; ++i) {
+        SCOPED_TRACE(i);
+
+        const double x = static_cast<double>(i);
         // x^2 = x^2
-        EXPECT_DOUBLE_EQ(*outputs[i].wait_and_get(), static_cast<double>(i) * static_cast<double>(i));
+        EXPECT_DOUBLE_EQ(*outputs[i].wait_and_get(), x * x);
     }
 
 }
@@ -41,22 +68,6 @@ TEST_F(RuntimeFixture, OutputRefLifeTime) {
 
     EXPECT_DOUBLE_EQ(*result.wait_and_get(), 25.0);
 
-}
-
-/*
- * Testing whether the result of a completed task is available, instead of rerun the task.
- */
-TEST_F(RuntimeFixture, ParentAlreadyCompleted) {
-
-    auto square = runtime.func_register([](double x) { return x * x; });
-
-    auto inc = runtime.func_register([](double x) { return x + 1; });
-
-    auto parent = runtime.invoke(square, 4.0);
-    EXPECT_DOUBLE_EQ(*parent.wait_and_get(), 16.0);
-
-    auto child = runtime.invoke(inc, parent);
-    EXPECT_DOUBLE_EQ(*child.wait_and_get(), 17.0);
 }
 
 
@@ -78,20 +89,13 @@ TEST_F(RuntimeFixture, Granuly) {
     }
 
     for (uint32_t i = 0; i < 10; ++i) {
-        DoNotOptimize(*outputs[i].wait_and_get());
+        SCOPED_TRACE(i);
+
+        EXPECT_EQ(
+            *outputs[i].wait_and_get(),
+            compute(i, i * 5)
+        );
     }
-}
-
-TEST_F(RuntimeFixture, FailurePropagates) {
-    auto boom = runtime.func_register([](double) -> double { throw std::runtime_error("boom"); });
-    auto inc  = runtime.func_register([](double x) { return x + 1; });
-
-    auto a = runtime.invoke(boom, 1.0);
-    auto b = runtime.invoke(inc, a);
-    auto c = runtime.invoke(inc, b);
-
-    EXPECT_THROW(c.wait_and_get(), std::runtime_error);
-    EXPECT_THROW(a.wait_and_get(), std::runtime_error);
 }
 
 // TEST_F(RuntimeFixture, Simple) {
@@ -143,4 +147,19 @@ TEST_F(DoubleFixture, MonteCarlo) {
 
 
 
-INSTANTIATE_TEST_SUITE_P(Sizes, RuntimeParamFixture, ::testing::Values(1, 10, 1000));
+
+
+INSTANTIATE_TEST_SUITE_P(
+  Configuration,
+  RuntimeMatrixFixture,
+  ::testing::Values(
+   RuntimeTestCase{1, 1000, false, 1},
+   RuntimeTestCase{2, 1000, true, 1},
+   RuntimeTestCase{4, 1000, true, 8},
+   RuntimeTestCase{8, 1000, true, 8},
+   RuntimeTestCase{4, 1000, false, 8},
+   RuntimeTestCase{4, 1000, true, 32}
+  )
+);
+
+// INSTANTIATE_TEST_SUITE_P(Sizes, RuntimeParamFixture, ::testing::Values(1, 10, 1000));

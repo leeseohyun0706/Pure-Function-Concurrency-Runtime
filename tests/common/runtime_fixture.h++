@@ -2,12 +2,12 @@
 #ifndef CONCAL_RUNTIME_FIXTURE_H
 #define CONCAL_RUNTIME_FIXTURE_H
 
-#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
-#include "math_helper.h++"
-#include "dual.h++"
 #include <pure/runtime.h++>
+#include "test_config.h++"
+#include "test_case.h++"
+
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -62,15 +62,7 @@ inline void burn_iterations(size_t iterations) {
 class RuntimeFixture : public ::testing::Test {
 protected:
 
-
-    static RuntimeConfiguration makeConfig() {
-        RuntimeConfiguration cfg;
-        cfg.scheduler.worker_size = 4;
-        cfg.tracing.enable = true;
-        return cfg;
-    }
-
-    Runtime runtime{makeConfig()};
+    Runtime runtime{test::make_config()};
     static const char* traceDir() { return "./traces"; }
 
 
@@ -81,39 +73,36 @@ protected:
 
     void TearDown() override {
         runtime.shutdown();
-
-        // auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
-        // std::string name = std::string(info->test_suite_name()) + "." + info->name();
-        // std::ranges::replace(name, '/', '_');
-        //
-        // std::filesystem::create_directories(traceDir());
-        // std::ofstream out(std::filesystem::path(traceDir()) / (name + ".json"));
-        // runtime.exportTrace(out);
     }
 };
 
-class RuntimeParamFixture : public RuntimeFixture, public ::testing::WithParamInterface<size_t> {};
-
-template<typename T>
-class MathRuntimeFixture : public RuntimeFixture {
+class RuntimeMatrixFixture : public RuntimeFixture, public ::testing::WithParamInterface<RuntimeTestCase> {
 protected:
-    MathFuncs<T> math{runtime};
+
+    std::unique_ptr<Runtime> runtime;
+
+    void SetUp() override {
+        const auto& params = GetParam();
+
+        auto config = test::make_config();
+
+        config.scheduler.worker_size = params.workers;
+        config.scheduler.work_stealing = params.work_stealing;
+        config.scheduler.global_queue_batch_size = params.batch_size;
+
+        runtime = std::make_unique<Runtime>(config);
+        runtime->start();
+    }
+
+
+    void TearDown() override {
+        if (runtime)
+            runtime->shutdown();
+    }
+
 };
 
-template<typename T>
-class MathParamFixture : public MathRuntimeFixture<T>, public ::testing::WithParamInterface<size_t>{};
-
-
-using DualFixture = MathRuntimeFixture<Dual>;
-using DoubleFixture = MathRuntimeFixture<double>;
-
-
-using DualParamFixture =
-    MathParamFixture<Dual>;
-
-using DoubleParamFixture =
-    MathParamFixture<double>;
-
+// class RuntimeParamFixture : public RuntimeFixture, public ::testing::WithParamInterface<size_t> {};
 
 
 #endif //CONCAL_RUNTIME_FIXTURE_H

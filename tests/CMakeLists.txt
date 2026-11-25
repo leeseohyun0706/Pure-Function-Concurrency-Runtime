@@ -3,7 +3,7 @@
 find_package(GTest CONFIG REQUIRED)
 
 include(GoogleTest)
-set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+
 function(c_add_test name label)
     add_executable(${name} ${ARGN})
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
@@ -12,7 +12,9 @@ function(c_add_test name label)
 endfunction()
 
 c_add_test(integration_tests integration integration/invoke_test.cpp
-        integration/dag_execution_test.cpp)
+        integration/dag_execution_test.cpp
+        integration/failure_test.cpp
+)
 
 c_add_test(stress_tests stress
         stress/massive_dag_test.cpp)

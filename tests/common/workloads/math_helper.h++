@@ -3,8 +3,8 @@
 #define CONCAL_MATH_HELPER_H
 #include <cmath>
 
-#include "pure/func.h++"
-#include "../../include/pure/runtime.h++"
+#include <pure/func.h++>
+#include <pure/runtime.h++>
 #include "dual.h++"
 
 // Adapters so Dual works with GenericMath (found by argument-dependent lookup)

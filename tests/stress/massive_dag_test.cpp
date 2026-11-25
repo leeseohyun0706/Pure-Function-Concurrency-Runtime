@@ -1,7 +1,6 @@
 
-#include "runtime_fixture.h++"
-#include <pure/runtime.h++>
-#include "dual.h++"
+#include "math_fixture.h++"
+#include "workloads/dag_builder.h++"
 
 TEST_P(DualParamFixture, MassiveDAG) {
     const auto N = GetParam();
@@ -16,40 +15,17 @@ TEST_P(DualParamFixture, MassiveDAG) {
 
     Dual x{0.0, 1.0};
 
-    std::optional<OutputRef<Dual>> result;
-    {
-        std::vector<OutputRef<Dual>> outputs;
-        for (int i = 1; i <= N; ++i) {
-            auto r = runtime.invoke(fn, x, i);
-            outputs.push_back(r);
-        }
-
-        while (outputs.size() > 1) {
-            std::vector<OutputRef<Dual>> next;
-            next.reserve((outputs.size() + 1) / 2);
-
-            for (size_t i = 0; i < outputs.size(); i += 2) {
-                if (i + 1 < outputs.size()) {
-                    auto r = runtime.invoke(
-                        math.add,
-                        outputs[i],
-                        outputs[i + 1]
-                    );
-                    next.push_back(
-                        r
-                    );
-                } else {
-                    next.push_back(outputs[i]);
-                }
-            }
-
-            outputs = std::move(next);
-        }
-        result = outputs.front();
+    std::vector<OutputRef<Dual>> outputs;
+    for (int i = 1; i <= N; ++i) {
+        auto r = runtime.invoke(fn, x, i);
+        outputs.push_back(r);
     }
 
-    EXPECT_NEAR(result->wait_and_get()->value, 0.0, 1e-10); // Given inaccuracy of floating-point in double type, I use EXPECT_NEAR
-    EXPECT_NEAR(result->wait_and_get()->derivative, double(N), 1e-8);
+    auto result = test::dag::reduce(runtime, math.add, outputs);
+
+
+    EXPECT_NEAR(result.wait_and_get()->value, 0.0, 1e-10); // Given inaccuracy of floating-point in double type, I use EXPECT_NEAR
+    EXPECT_NEAR(result.wait_and_get()->derivative, double(N), 1e-8);
 
 }
 

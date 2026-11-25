@@ -1,4 +1,4 @@
-#include "runtime_fixture.h++"
+#include "math_fixture.h++"
 
 // x^2 + sin(x)
 TEST_F(DualFixture, BasicDAG) {
@@ -35,9 +35,6 @@ TEST_F(DualFixture, Chain) {
 // (((10 + 5) * 2) + ((10 + 5) - 3)) / 6 = 7
 TEST_F(DoubleFixture, DiamondDAG) {
 
-
-    OutputRef<double> res{nullptr, nullptr};
-
     auto a = runtime.invoke(math.add, 10, 5);
     auto b = runtime.invoke(math.mul, a, 2);
     auto c = runtime.invoke(math.sub, a, 3);
@@ -45,8 +42,25 @@ TEST_F(DoubleFixture, DiamondDAG) {
     auto d = runtime.invoke(math.add, b, c);
     auto e = runtime.invoke(math.div, d, 6);
 
-    EXPECT_EQ(int(*e.wait_and_get()), 7);
+    EXPECT_EQ(static_cast<int>(*e.wait_and_get()), 7);
 
 }
 
+
+
+/*
+ * Testing whether the result of a completed task is available, instead of rerun the task.
+ */
+TEST_F(RuntimeFixture, ParentAlreadyCompleted) {
+
+    auto square = runtime.func_register([](double x) { return x * x; });
+
+    auto inc = runtime.func_register([](double x) { return x + 1; });
+
+    auto parent = runtime.invoke(square, 4.0);
+    EXPECT_DOUBLE_EQ(*parent.wait_and_get(), 16.0);
+
+    auto child = runtime.invoke(inc, parent);
+    EXPECT_DOUBLE_EQ(*child.wait_and_get(), 17.0);
+}
 

@@ -27,8 +27,8 @@
       "hidden": true,
       "inherits": "base",
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
-        "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++"
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       }
     },
     {
@@ -61,51 +61,43 @@
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "debug",
-      "jobs": 6
+      "configurePreset": "debug"
     },
     {
       "name": "release",
-      "configurePreset": "release",
-      "jobs": 6
+      "configurePreset": "release"
     },
     {
       "name": "tsan",
-      "configurePreset": "tsan",
-      "jobs": 6
+      "configurePreset": "tsan"
     }
   ],
 
   "testPresets": [
     {
-      "name": "debug",
-      "configurePreset": "debug",
-      "output": {
+      "name": "test-base",
+      "hidden" : true,
+      "output" : {
         "outputOnFailure": true
       },
-      "execution": {
+      "execution" : {
         "noTestsAction": "error"
       }
+    },
+    {
+      "name": "debug",
+      "inherits": "test-base",
+      "configurePreset": "debug"
     },
     {
       "name": "release",
-      "configurePreset": "release",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-base",
+      "configurePreset": "release"
     },
     {
       "name": "tsan",
-      "configurePreset": "tsan",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-base",
+      "configurePreset": "tsan"
     }
   ]
 }
